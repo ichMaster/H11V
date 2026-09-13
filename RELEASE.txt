@@ -4,6 +4,33 @@ H11V release log
 Newest first. A release is cut per roadmap phase (vA.B -> A.B.0); a post-release
 fix on that phase bumps the third number. See specification/SDLC.md.
 
+0.3.0 — 2026-09-13 — v0.3 Water and trees
+-----------------------------------------
+
+The island reads as a place: water that flows, trees that stand.
+
+  * water_flowing completes the liquid pair, cross-referenced both ways. Without
+    it the first shoreline the player digs spawns unknown-node checkerboards.
+  * Trees as a decoration schematic — placed once with the chunk by the mapgen
+    thread, costing nothing per tick. No leafdecay: a per-tick ABM over every
+    leaf is not what v0 should be measuring.
+  * Gate: elevation_range=19, turf 92%, water=70, trees=46.
+
+  Two things v0.2 had wrong, found while giving the water somewhere to be:
+
+  set_mapgen_setting(..., false) means NEVER, not "unless already set" — the
+  engine writes its defaults into map_meta at world creation, before mods load.
+  v0.2's terrain tuning was inert, and the elevation range it cited as proof was
+  stock v7 noise.
+
+  v7's height is a blend of two noises through a third, not one noise, so tuning
+  terrain_base alone moves almost nothing. The blend is now pinned and
+  terrain_base is the single dial.
+
+  And one the trees found: the gate called the first solid node from the sky "the
+  surface", which once trees existed was a canopy. Ground and canopy are now
+  distinct, with the definition written where it is computed.
+
 0.2.1 — 2026-09-13 — post-release fix on v0.2
 --------------------------------------------
 

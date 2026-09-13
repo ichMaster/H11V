@@ -4,6 +4,43 @@ H11V release log
 Newest first. A release is cut per roadmap phase (vA.B -> A.B.0); a post-release
 fix on that phase bumps the third number. See specification/SDLC.md.
 
+0.7.0 — 2026-09-13 — v0.7 The measurement session, and v0 complete
+------------------------------------------------------------------
+
+The device answered the questions v0 existed to ask.
+
+  * Low and mid hold 30 fps with a drawtime of 2-3 ms against a 33 ms budget —
+    the V3D is barely working and there is real headroom for v1 and v2. High
+    cannot reach 60, and the engine cuts its view range from 100 to 60 trying to.
+    mid is the default.
+  * 32x32 textures read at 3.5 inches. Confirmed the hard way: 16x16 was built,
+    installed, looked at and reverted, which also retired two plausible arguments
+    for it — "drawn in 2-pixel clusters" (measured: 44%) and "shimmers less"
+    (measured: no difference).
+  * The bright palette holds at night rather than going grey, the H11 glyph
+    reads, and touch digging and placing work.
+
+  Three defects that only a person holding the device could find:
+
+  The game granted no privileges, so /time refused and the touch menu's own
+  Fly/Fast/Noclip buttons were dead. It looked finished while three of its
+  controls did nothing.
+
+  Night was unplayable, and 5.10 has no brightness lever — no light_curve_*
+  family, and display_gamma measurably does nothing. Light in this engine comes
+  from blocks, so the H11 crust became the light at 12 of 14. ART.md already said
+  H11 leaves a faint cyan-to-lilac glow on what it has touched; from v1 the
+  mutation front will light the world as it spreads.
+
+  The engine's dialogs overflowed a 640x480 panel in two ways needing two fixes:
+  font_size for labels overlapping inside their cells, gui_scaling for a dialog
+  simply wider than the screen.
+
+  Also: the game is in the Sway menu, tree density is a setting so the world's
+  shape can be judged from outside a forest, and a measurement protocol exists
+  that sets up identical conditions and captures the evidence without pretending
+  to read a frame rate off its own screenshot.
+
 0.6.0 — 2026-09-13 — v0.6 Device profiles and scripts
 ----------------------------------------------------
 

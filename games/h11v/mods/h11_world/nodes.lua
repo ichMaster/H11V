@@ -91,7 +91,10 @@ local NODES = {
 		-- the player digs spawns unknown-node checkerboards.
 		id = "water_source",
 		description = S("Water"),
-		drawtype = "liquidsource",
+		-- "liquid", not "liquidsource": the latter is not a Luanti drawtype, and an
+		-- unknown one falls back to a normal cube with no error — water that looks
+		-- like solid teal stone. ARCHITECTURE.md pins this.
+		drawtype = "liquid",
 		tiles = {
 			{
 				name = "h11_water.png",

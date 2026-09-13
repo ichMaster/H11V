@@ -155,7 +155,13 @@ MIN_SURFACE_PCT=80
 
 fail=0
 assert_min() { # name value minimum
-	if [ "$2" -lt "$3" ] 2>/dev/null; then
+	# The non-numeric case must FAIL, not pass. `[ nil -lt 8 ]` exits 2, and a bare
+	# `if` would take that as "not less than" and print ok — so a probe reporting
+	# surface_min=nil would sail through the gate it exists to be caught by.
+	case "$2" in
+		''|*[!0-9-]*|-) echo "  FAIL $1=$2 (not a number)" >&2; fail=1; return ;;
+	esac
+	if [ "$2" -lt "$3" ]; then
 		echo "  FAIL $1=$2 (need >= $3)" >&2; fail=1
 	else
 		echo "  ok   $1=$2 (>= $3)"

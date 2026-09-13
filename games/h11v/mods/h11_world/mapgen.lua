@@ -49,9 +49,6 @@ core.register_biome({
 	depth_filler = 2,
 	node_riverbed = "h11_world:sand",
 	depth_riverbed = 2,
-	-- Shore sand: the band either side of the water line, which is what makes a
-	-- lake read as a lake rather than as a hole with water in it.
-	node_dungeon = "h11_world:stone",
 	y_max = 200,
 	y_min = -100,
 	heat_point = 50,

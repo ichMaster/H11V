@@ -32,7 +32,7 @@ local function report(fields)
 end
 
 --- Walk down from the sky to the first non-air node: that is the surface.
-local function surface_at(vm, area, data, x, z)
+local function surface_at(area, data, x, z)
 	for y = Y_MAX, Y_MIN, -1 do
 		local vi = area:index(x, y, z)
 		local id = data[vi]
@@ -64,7 +64,7 @@ local function scan()
 	for x = pmin.x, pmax.x, 4 do
 		for z = pmin.z, pmax.z, 4 do
 			columns = columns + 1
-			local y, id = surface_at(vm, area, data, x, z)
+			local y, id = surface_at(area, data, x, z)
 			if y then
 				sampled = sampled + 1
 				local name = names[id] or ("id:" .. tostring(id))

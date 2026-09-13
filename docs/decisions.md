@@ -202,3 +202,41 @@ rewriting a released phase's acceptance numbers to match whichever was chosen.
 **Owed to v1**, where the world's size is a genuine design question rather than a setting: pick
 80×80 or 240×240 (or a soft barrier at 128 inside a larger generated region), update VISION to the
 number actually chosen, and re-derive the gate's density thresholds from it.
+
+---
+
+## v0.6 — Device profiles and scripts
+
+### 2026-09-13 — The device renders through GLX on XWayland, not EGL on Wayland
+
+Debian trixie's `luanti` 5.10 is the **legacy Irrlicht X11 build**: linked against `libX11`, with no
+SDL, no EGL and no GLESv2. The binary contains the strings `ogles2` and `opengl3`, so both look like
+valid `video_driver` values — and the engine rejects both at runtime with `Invalid video_driver`,
+then falls through to an X11 device and dies with `Need running XServer`.
+
+**Decision:** `video_driver = opengl`, and `DISPLAY=:0` set explicitly by `tools/run_on_pi.sh` (over
+ssh there is none). The render path is GLX → XWayland → Mesa V3D.
+
+**It is still hardware**, which is the part that matters:
+
+```
+DISPLAY=:0 glxinfo -B
+  direct rendering: Yes
+  OpenGL renderer string: V3D 7.1.7.0
+  OpenGL version string: 3.1 Mesa 25.0.7-2+rpt4
+```
+
+**Consequence for the preflight, and the reason this entry exists:** `tools/gpu_preflight.sh`
+originally probed **EGL**, which reported `V3D 7.1.7.0` — correctly, and about a path the game never
+takes. A check that verifies the wrong path is not a weaker check, it is a false one. It now probes
+GLX first and keeps EGL as a secondary reading. ARCHITECTURE.md §The GPU path is corrected to match.
+
+### 2026-09-13 — `--gameid list` writes to stderr on 5.10 and stdout on 5.17
+
+The game-visibility guard added by v0.1's code review read only stdout, so on the device it saw
+nothing and **blocked a deploy that would have worked**.
+
+**Why it is recorded rather than just fixed:** the guard was added *because* a silent failure had cost
+a debugging session, and it promptly caused one of its own in the opposite direction. A guard that
+produces false positives is worse than no guard, because it is believed. Both `run_on_pi.sh` and
+`run_local.sh` now capture both streams.

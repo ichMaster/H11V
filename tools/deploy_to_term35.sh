@@ -3,6 +3,7 @@
 #
 #   tools/deploy_to_term35.sh                 copy the game + mid profile, start it
 #   tools/deploy_to_term35.sh --profile=low   pick the graphics profile (low|mid|high)
+#   tools/deploy_to_term35.sh --fresh         delete the device world first
 #   tools/deploy_to_term35.sh --no-run        copy only, do not start
 #   tools/deploy_to_term35.sh --stop          stop whatever is running on the device
 #   tools/deploy_to_term35.sh --log           tail the game log on the device
@@ -25,10 +26,11 @@ GAME_SRC="$ROOT/games/h11v"
 REMOTE_DIR="h11v"
 PROFILE="mid"
 
-do_run=1 setup_key=0 stop_only=0 log_only=0
+do_run=1 setup_key=0 stop_only=0 log_only=0 fresh=0
 for arg in "$@"; do
 	case "$arg" in
 		--profile=*) PROFILE="${arg#*=}" ;;
+		--fresh) fresh=1 ;;
 		--no-run) do_run=0 ;;
 		--setup-key) setup_key=1 ;;
 		--stop) stop_only=1 ;;
@@ -206,6 +208,14 @@ fi
 	mv minetest.conf.incoming minetest.conf
 	mv run_on_pi.sh.incoming run_on_pi.sh && chmod +x run_on_pi.sh
 "
+
+# Chunks are persisted, so a world generated before a mapgen change keeps showing
+# the old terrain — and a deploy that silently shows stale geometry is how a fixed
+# mapgen gets reported as still broken. v0.7's fixed-seed protocol needs this too.
+if [ "$fresh" = 1 ]; then
+	"${SSH[@]}" "$TARGET" 'rm -rf ~/.luanti/worlds/h11v_dev ~/.minetest/worlds/h11v_dev'
+	echo "==> removed the device world; it will regenerate"
+fi
 
 if [ "$do_run" = 0 ]; then
 	echo "==> copied. Start it on the device with:  ~/$REMOTE_DIR/run_on_pi.sh"

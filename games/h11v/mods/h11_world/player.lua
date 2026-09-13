@@ -53,54 +53,63 @@ end)
 
 --- Where the player appears.
 --
--- The engine's static spawn can drop a player into the sea or inside a tree, and
--- on a 128x128 map with lakes that is not a rare accident. So: look for turf,
--- above the water line, with air above it, spiralling out from the origin until
--- one is found.
+-- The engine's default spawn can put a player inside the ground: our terrain's
+-- surface runs from y=6 to y=25 and the default is not aware of that.
+--
+-- The obvious fix — scan downward with core.get_node until turf appears — does
+-- not work on a fresh world, and fails in the worst way. A new player joins
+-- before the map around the origin has been emerged, so every get_node returns
+-- "ignore", the scan finds nothing, and the player is silently left wherever the
+-- engine put them. The screen is simply black, with nothing in any log to say
+-- why. (Found on the device: the hotbar rendered, the world did not.)
+--
+-- core.get_spawn_level is the right tool: it asks the MAPGEN what the surface
+-- height at a column will be, which needs no loaded map and is available the
+-- instant a player joins.
 local WATER_LEVEL = 6
 
-local function is_good_spawn(pos)
-	local ground = core.get_node(pos).name
-	if ground ~= "h11_world:turf" then return false end
-	local above = core.get_node({ x = pos.x, y = pos.y + 1, z = pos.z }).name
-	local head = core.get_node({ x = pos.x, y = pos.y + 2, z = pos.z }).name
-	return above == "air" and head == "air"
+local function spawn_for(x, z)
+	local y = core.get_spawn_level(x, z)
+	-- nil means the mapgen has no suitable surface there (underwater, or outside
+	-- the generated region). Above the water line, or the player arrives swimming.
+	if y and y > WATER_LEVEL then
+		return { x = x, y = y + 0.5, z = z }
+	end
+	return nil
 end
 
 local function find_spawn()
-	for radius = 0, 60, 4 do
-		for _, offset in ipairs({
-			{ x = radius, z = 0 }, { x = -radius, z = 0 },
-			{ x = 0, z = radius }, { x = 0, z = -radius },
-			{ x = radius, z = radius }, { x = -radius, z = -radius },
-		}) do
-			local x, z = offset.x, offset.z
-			-- Search downward from well above the terrain: the first turf with two
-			-- air blocks over it is a place a player fits.
-			for y = 40, WATER_LEVEL, -1 do
-				local pos = { x = x, y = y, z = z }
-				if is_good_spawn(pos) then
-					return { x = x, y = y + 1, z = z }
-				end
+	-- Spiral outward from the origin. On a map that is mostly land this succeeds
+	-- on the first or second try; the loop exists for the case where it does not.
+	for radius = 0, 60, 6 do
+		if radius == 0 then
+			local pos = spawn_for(0, 0)
+			if pos then return pos end
+		else
+			for _, o in ipairs({
+				{ radius, 0 }, { -radius, 0 }, { 0, radius }, { 0, -radius },
+				{ radius, radius }, { -radius, -radius }, { radius, -radius }, { -radius, radius },
+			}) do
+				local pos = spawn_for(o[1], o[2])
+				if pos then return pos end
 			end
 		end
 	end
 	return nil
 end
 
-core.register_on_respawnplayer(function(player)
+local function place(player)
 	local pos = find_spawn()
 	if pos then
 		player:set_pos(pos)
-		return true    -- we handled it; the engine must not also move the player
+		return true
 	end
+	core.log("warning", "[h11_world] no spawn above water found; leaving the engine's default")
 	return false
-end)
+end
 
-core.register_on_newplayer(function(player)
-	local pos = find_spawn()
-	if pos then player:set_pos(pos) end
-end)
+core.register_on_newplayer(place)
+core.register_on_respawnplayer(place)
 
 --- The HUD: hotbar and crosshair, and nothing else.
 --

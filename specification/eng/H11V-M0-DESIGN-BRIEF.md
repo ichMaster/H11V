@@ -1,5 +1,7 @@
 # H11V — design brief for Claude Design: the M0 asset pack
 
+> **Status: delivered and accepted, 13 September 2026.** The pack is in `specification/art/h11v/`. Section 9 records the audit against this brief and the three deltas worth knowing. This brief stays the contract — re-deliveries must still satisfy it.
+
 This brief is for Claude Design. It orders every visual asset the M0 milestone of H11V needs, with exact filenames, sizes and formats. The engineering context lives in [H11V-M0-SPEC.md](H11V-M0-SPEC.md); the world and art canon in [H11V-CONCEPT.md](H11V-CONCEPT.md), section 12. Where this brief fixes a filename or size, it is a contract with the code — deliver exactly that.
 
 ## 1. The game, in one breath
@@ -51,7 +53,7 @@ Starting points sampled from the references; keep the family, tune freely within
 
 The Luanti engine consumes these files directly; deviations fail silently (wrong faces, fringes, checkerboards), so treat this list as law:
 
-- **PNG only**, 8 bits per channel (PNG-24 opaque / PNG-32 with alpha), sRGB, **no embedded ICC profile**, no interlacing, no 16-bit channels.
+- **PNG only**, 8 bits per channel (PNG-24 opaque / PNG-32 with alpha), sRGB, **no embedded ICC profile**, no interlacing, no 16-bit channels. Ship the files **metadata-free** — no content-credential (`caBX`/C2PA), EXIF or text chunks: on a 32x32 texture such a chunk outweighs the image roughly 20:1.
 - **Exact lowercase filenames** as ordered — the device filesystem is case-sensitive; a stray capital letter is a missing texture.
 - **Alpha is three regimes, never mixed:** terrain tiles (dirt, turf, stone, sand, trunk, crust) are **fully opaque** — no stray semi-transparent pixels; leaves, the hand and the crosshair use **binary alpha** (every pixel 0% or 100% — anti-aliased edges against transparency produce fringes, and the hand is literally extruded); only water and the HUD glass panels use **partial alpha**.
 - **The hand is extruded.** The engine turns `h11_hand.png` into a thin 3D mesh by extruding its opaque pixels — design the silhouette to survive extrusion: chunky, closed shapes, binary alpha, no floating anti-aliased specks (each becomes a floating 3D crumb).
@@ -116,3 +118,28 @@ Bot models or skins (M2), the H11 event card and cycle HUD (M1), the anchor devi
 ## 8. Delivery
 
 Files named exactly as in section 5 (lowercase, case-sensitive), PNG per the §4.1 export contract, in a flat folder per destination (`textures/`, `menu/`, game root for `screenshot.png`). If a texture wants a variant you believe in, deliver it as `<name>_alt.png` alongside the contracted file, never instead of it.
+
+The delivered pack took the better option and mirrored the destination tree directly — `specification/art/h11v/{menu,mods/h11_world/textures,screenshot.png}` — which makes installation a single `rsync` into `games/h11v/`. Keep that shape for re-deliveries.
+
+## 9. Delivery audit — 13 September 2026
+
+All 26 ordered files present, exact filenames, exact dimensions. Verified programmatically:
+
+| Check | Result |
+| --- | --- |
+| Filenames and sizes vs §5 | all match, including the optional glyph set and `h11_crust_2.png` |
+| Alpha regimes vs §4.1 | exactly as specified: terrain opaque; leaves, hand, crosshair, glyphs binary; water and HUD glass partial |
+| Colours per node texture | 4-14, within the ~16 budget |
+| ICC profiles | none |
+| Tiling (all §5.1 node faces) | seamless; edge discontinuity is within interior variance |
+| Frame strips | `h11_water` 8 frames, `h11_water_flowing` 16, correct vertical layout |
+| Hotbar cell structure | 8 pixel-identical 64x64 cells — the lossless 6-slot crop works as required |
+| Hand silhouette | binary alpha, closed chunky shapes, safe to extrude |
+
+Three deltas, none blocking:
+
+1. **Content-credential metadata.** Every PNG carries a 5,758-byte `caBX` (C2PA) chunk — ~95% of a 32x32 texture's bytes, ~150 KB across the pack. Harmless to the engine (PNG decoders skip unknown ancillary chunks) but pointless weight on a device that syncs over the network, so the M0 spec strips it during installation. Future deliveries should omit it (§4.1).
+2. **Water alpha is 204-228 (80-89%)** where §6 asked for 70-85% — slightly more opaque than specified. Judge it on the device during the section 5 eyeball pass; if the bed reads too faintly through a lake, ask for a lighter pass rather than editing the delivery.
+3. **`h11_water_flowing` has 16 frames but only 8 unique ones** (the sequence repeats at frame 9). It animates correctly and matches the ordered dimensions; it is simply twice the bytes it needs. Leave as is unless the flow animation reads as too fast, in which case the duplicate half is free headroom.
+
+Two things that look like defects and are not: `h11_turf_side` and `h11_trunk_side` show a top-to-bottom discontinuity, which is correct — the turf side carries its green fringe in the top rows by design, and both tile horizontally, which is the axis that matters for block sides. And `screenshot.png` is an isometric mockup composited from the real textures rather than an in-game capture, which is the only thing it could be before the game exists; replace it after the M0 device session.

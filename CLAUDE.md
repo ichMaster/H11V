@@ -12,6 +12,7 @@ The specs are the source of truth and are kept in English under `specification/e
 - [specification/eng/H11V-M0-SPEC.md](specification/eng/H11V-M0-SPEC.md) — the concrete M0 milestone spec: scope, components, graphics-profile protocol, project structure (§7), architecture (§8), implementation plan (§9).
 - [specification/eng/H11V-M0-DESIGN-BRIEF.md](specification/eng/H11V-M0-DESIGN-BRIEF.md) — the asset order for Claude Design: exact filenames/sizes are a contract with the code.
 - `specification/art/ref-01-h11-event.png`, `ref-02-bot-echo.png`, `ref-03-anchor-biomes.png` — canonical art (concept §12 says what each canonizes).
+- `specification/art/h11v/` — **the delivered M0 asset pack** (22 textures, 3 menu images, screenshot), audited and accepted. It mirrors `games/h11v/` exactly, so installing is `rsync -a specification/art/h11v/ games/h11v/` followed by a metadata strip (M0 spec §8). Treat it as the delivery of record: edit the game's copy, never this one.
 
 Re-read both, plus `docs/decisions.md` once it exists, before starting a milestone.
 
@@ -19,7 +20,7 @@ Re-read both, plus `docs/decisions.md` once it exists, before starting a milesto
 
 H11V is fully self-contained — no code, prompts, or assets come in from any other repository or project. It is a Minecraft-like voxel game for a pocket device where a first-person player and three bots share one small world (~128x128, no infinite generation), and the "H11 algorithm" mutates both the terrain and the creatures in slow, visible cycles driven by a data table of deterministic rules. There is no win condition.
 
-Art direction is **bright-luminous** (concept §12): vivid greens, ivory stone, lilac mutation crystal, cyan sci-fi HUD — never dark/horror. Textures are 32x32 and come exclusively from the designed asset pack ordered by the design brief; there is no procedural texture generation. The bots are canon: **DRIFT** (BOT 01, cyan, curiosity-driven), **ECHO** (BOT 02, amber, balanced observer), **MOSS** (BOT 03, green, safety/energy-driven), sharing the needs triad energy/curiosity/safety.
+Art direction is **bright-luminous** (concept §12): vivid greens, ivory stone, lilac mutation crystal, cyan sci-fi HUD — never dark/horror. Textures are 32x32 and come exclusively from the designed asset pack (delivered 13.09.2026, in `specification/art/h11v/`); there is no procedural texture generation. The bots are canon: **DRIFT** (BOT 01, cyan, curiosity-driven), **ECHO** (BOT 02, amber, balanced observer), **MOSS** (BOT 03, green, safety/energy-driven), sharing the needs triad energy/curiosity/safety.
 
 Target device: **Waveshare PocketTerm35** — Raspberry Pi 5 / 4 GB, 3.5" 640x480 touchscreen + keyboard, Raspberry Pi OS with Sway (Wayland), **no mouse**. Development happens on a MacBook M1, so every feature needs both a Mac run path and a device run path.
 
@@ -72,7 +73,7 @@ Pathfinding uses the stock `core.find_path`; perception reads the real nodes aro
 
 ## Milestones
 
-- **M0** — ground truth on the device: Luanti running fullscreen from Sway, touch + keyboard working, terrain/water/trees/day-night cycle, gauntlet hand + styled hotbar, designed asset pack integrated, three graphics profiles measured (low/mid/high, avg and min fps after 30 s of walking, same seed and start point) and written into `docs/decisions.md` with screenshots in `docs/device/`. No bots, no brain, no mutations. Only the asset-pack integration step blocks on Claude Design; headless steps proceed without textures (M0 spec §9).
+- **M0** — ground truth on the device: Luanti running fullscreen from Sway, touch + keyboard working, terrain/water/trees/day-night cycle, gauntlet hand + styled hotbar, designed asset pack integrated, three graphics profiles measured (low/mid/high, avg and min fps after 30 s of walking, same seed and start point) and written into `docs/decisions.md` with screenshots in `docs/device/`. No bots, no brain, no mutations. The asset pack is already delivered, so no M0 step blocks on external work (M0 spec §9).
 - **M1** — `h11_world` grows up: three biomes, first mutation cycle on ABMs, cycle HUD, saved log (the 8 block types and the terrain already land in M0).
 - **M2** — bots: body + StubBrain ported to Lua, three visible bots reacting to world mutations.
 - **M3** — `brain/` service on the LAN with per-bot character prompts, HTTP bridge, StubBrain fallback.

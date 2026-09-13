@@ -2,7 +2,7 @@
 
 M0 is one player in one world, without bots and without a server. The goal is to test the device and to see how well Luanti draws a voxel world on the Pi 5 GPU at 640x480, and which settings give a good picture at a stable frame rate. Anything that does not help answer that question is not part of M0.
 
-Visual canon: the bright-luminous art direction fixed in [H11V-CONCEPT.md](H11V-CONCEPT.md) section 12 and the reference images in `specification/art/`. All M0 assets come from the designed pack ordered by [H11V-M0-DESIGN-BRIEF.md](H11V-M0-DESIGN-BRIEF.md); there is no procedural texture generation.
+Visual canon: the bright-luminous art direction fixed in [H11V-CONCEPT.md](H11V-CONCEPT.md) section 12 and the reference images in `specification/art/`. All M0 assets come from the designed pack ordered by [H11V-M0-DESIGN-BRIEF.md](H11V-M0-DESIGN-BRIEF.md); there is no procedural texture generation. **The pack was delivered on 13 September 2026 and audited against that brief — it lives in `specification/art/h11v/`, and section 8 says how it reaches the game.**
 
 ## 1. Outcome
 
@@ -81,7 +81,10 @@ H11V/
     deploy_to_pi.sh               rsync game + assembled conf to the Pi
     test_worldgen.sh              headless acceptance test (section 6)
   specification/
-    eng/  ukr/  art/
+    eng/  ukr/
+    art/                          canonical reference images (ref-*.png)
+      h11v/                       the delivered M0 asset pack, mirroring games/h11v/
+        menu/  mods/h11_world/textures/  screenshot.png
   docs/
     decisions.md                  running log of closed decisions and measurements
     device/                       fps notes and screenshots per profile
@@ -109,7 +112,21 @@ Rules the structure encodes: the game is self-contained under `games/h11v` and c
 - `player.lua` overrides the hand (`core.override_item("", ...)`) with `tool_capabilities` for `crumbly`/`cracky`/`choppy`/`snappy` and the gauntlet `wield_image`; gives the starting inventory in `register_on_newplayer`; sets the hotbar length to 8 and its designed textures via `hud_set_hotbar_itemcount`, `hud_set_hotbar_image` and `hud_set_hotbar_selected_image`; and disables the HUD elements M0 does not use (health, breath) with `hud_set_flags`, leaving hotbar and crosshair.
 - `init.lua` is only `dofile` calls in a fixed order: nodes, mapgen, player.
 
-**Assets are content, not code.** The designed pack from [H11V-M0-DESIGN-BRIEF.md](H11V-M0-DESIGN-BRIEF.md) drops into `h11_world/textures/` and `games/h11v/menu/` under the exact filenames the brief fixes; code references those names and nothing else. Until the pack lands, headless work proceeds without textures (the server does not render), and visual steps wait — see section 9 ordering.
+**Assets are content, not code.** The delivered pack lives in `specification/art/h11v/` and is laid out as an exact mirror of `games/h11v/`, so installing it is one copy and no renaming:
+
+```
+rsync -a --exclude .DS_Store specification/art/h11v/  games/h11v/
+```
+
+That lands `menu/{icon,header,background}.png`, `screenshot.png` and all 22 textures in `mods/h11_world/textures/`. Code references those filenames and nothing else; the brief's section 5 is the contract, and section 9 of the brief records the delivery audit.
+
+One cleanup belongs to that copy step: every delivered PNG carries a 5,758-byte `caBX` chunk (C2PA content credentials), which is ~95% of a 32x32 texture's file size and about 150 KB across the pack. PNG decoders must skip unknown ancillary chunks, so the engine is unaffected — it is pure weight on a device that syncs over the network. Strip it on the way in and keep the pack in `specification/art/` pristine as the delivery of record:
+
+```
+find games/h11v -name '*.png' -exec sips -s format png {} --out {} \;   # or: pngcrush -rem allb
+```
+
+Keeping the source pack under `specification/` rather than moving it means a re-delivery from Claude Design is a drop-in replacement, and the game tree stays reproducible from spec + one command.
 
 **Configuration layering.** `tools/device/minetest.conf` holds everything shared (fullscreen 640x480, `touch_controls`, scaling, font); the three `device-*.conf` files hold only the deltas from section 5. `deploy_to_pi.sh` concatenates base + chosen profile into the single config the Pi runs with, and `run_local.sh` does the same on the Mac with fullscreen swapped for a window. One source of truth for shared settings, no drift between profiles.
 
@@ -120,15 +137,15 @@ Rules the structure encodes: the game is self-contained under `games/h11v` and c
 Each step is one commit (English message), and every step that can be checked headlessly is checked before moving on. Steps 1-3 do not need the asset pack; step 4 is where it lands.
 
 0. **Toolchain.** Install Luanti on the Mac and on the Pi (Pi OS package; AppImage/Flatpak fallback if the repo version lags — this is also the first risk check for the 5.8 touch regression). On the Pi, run the GPU preflight from section 5 (`mesa-utils`, renderer = V3D) before anything else. Record both versions and the renderer string in `docs/decisions.md`. No commit; a decisions entry.
-1. **Skeleton.** `games/h11v/game.conf` + empty `h11_world` (mod.conf, init.lua). The game appears in Luanti's menu and creates a world. In parallel, send [H11V-M0-DESIGN-BRIEF.md](H11V-M0-DESIGN-BRIEF.md) to Claude Design so asset production overlaps steps 2-3.
+1. **Skeleton.** `games/h11v/game.conf` + empty `h11_world` (mod.conf, init.lua). The game appears in Luanti's menu and creates a world.
 2. **Blocks and terrain.** `nodes.lua` with the full NODES table and mapgen aliases; `mapgen.lua` with mapgen parameters; first version of `test_worldgen.sh` asserting the elevation range. Headless test green.
 3. **Water and trees.** The water source/flowing pair registered and cross-referenced; the surface biome registration verified by generating a world and confirming turf on top rather than bare stone; tree decoration with the schematic; `test_worldgen.sh` extended to the full section 6 assertions (water present, ≥ 20 trees). Headless test green.
-4. **Asset pack integration.** Drop the delivered pack into `textures/` and `menu/`; verify every NODES entry resolves its textures (no "unknown node" checkerboards) in a Mac window run.
+4. **Asset pack integration.** Run the rsync and the metadata strip from section 8; verify every NODES entry resolves its textures (no "unknown node" checkerboards) in a Mac window run, that water reads as translucent over the bed, and that leaves show their holes.
 5. **Player layer.** `player.lua`: hand with gauntlet wield image, starting inventory (a stack of each placeable block), surface spawn, 8-slot hotbar with the designed bar and selection frames, crosshair, HUD flags. Mac run: walk, dig, place, day-night pass.
 6. **Device profiles and scripts.** `tools/device/*.conf`, `run_local.sh`, `run_on_pi.sh`, `deploy_to_pi.sh`. `run_local.sh` on the Mac reproduces device settings in a 640x480 window.
 7. **Device session.** Deploy to the PocketTerm35; re-check the GPU preflight, then run the section 5 measurement protocol (three profiles + the shadows run, same seed, same spot, 30 s walks); save screenshots to `docs/device/`; write fps, the chosen default profile, the Luanti version and the renderer string into `docs/decisions.md`. M0 done per section 1.
 
-Dependency note: only step 4 blocks on Claude Design. If the pack is late, steps 5-6 may proceed with placeholder-free code paths (hotbar/crosshair styling calls guarded behind a texture-exists check), but the device session (step 7) waits for the pack — measuring fps with missing textures would not answer M0's question about the real picture.
+Dependency note: the asset pack is already delivered, so nothing in this plan blocks on external work. `screenshot.png` ships as an isometric mockup composited from the real textures; replace it with a genuine device capture from step 7 once one exists.
 
 ## 10. Next milestones
 

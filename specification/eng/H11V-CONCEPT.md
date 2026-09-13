@@ -63,7 +63,7 @@ games/h11v/           the Luanti game (game.conf, menu/, mods/)
   mods/h11_hud/       cycle HUD, bot panels (from M1-M2)
 brain/                Python brain service for the LAN machine (from M3)
 tools/                scripts: headless test runs, device profiles, deployment to the Pi
-specification/        eng/ (source of truth), ukr/ (Ukrainian mirror), art/ (canonical references)
+specification/        eng/ (source of truth), ukr/ (Ukrainian mirror), art/ (references + h11v/ asset pack)
 docs/                 the decisions log and device measurements
 ```
 
@@ -99,7 +99,7 @@ Touch in Luanti on Linux had a regression in 5.8 on aarch64 — verify at M0. Th
 
 **13 September 2026.** The specifications are kept in English under `specification/eng/`; they are the source of truth. `specification/ukr/` holds a Ukrainian translation of the same documents, re-translated whenever the English changes — when the two disagree, English wins. H11V is a standalone project: no code, prompts or assets are carried in from anywhere else.
 
-**13 September 2026, art and design.** The art direction is the bright-luminous canon of section 12, per the reference images in `specification/art/` — not a dark palette. Textures are 32x32. All assets come from a designed pack ordered through [H11V-M0-DESIGN-BRIEF.md](H11V-M0-DESIGN-BRIEF.md); there is no procedural texture generation. The bots are canon from the art: DRIFT (BOT 01, cyan), ECHO (BOT 02, amber), MOSS (BOT 03, green), sharing the needs triad energy / curiosity / safety with per-bot weightings (section 3).
+**13 September 2026, art and design.** The art direction is the bright-luminous canon of section 12, per the reference images in `specification/art/` — not a dark palette. Textures are 32x32. All assets come from a designed pack ordered through [H11V-M0-DESIGN-BRIEF.md](H11V-M0-DESIGN-BRIEF.md); there is no procedural texture generation. That pack was delivered and accepted the same day: it lives in `specification/art/h11v/`, mirrors the `games/h11v/` tree, and is the canonical look of every block, the hand, the HUD and the menu — the `ref-*.png` images remain the mood and UI canon, the pack is the pixels. The bots are canon from the art: DRIFT (BOT 01, cyan), ECHO (BOT 02, amber), MOSS (BOT 03, green), sharing the needs triad energy / curiosity / safety with per-bot weightings (section 3).
 
 ## 11. Open questions
 
@@ -109,7 +109,7 @@ Touch in Luanti on Linux had a regression in 5.8 on aarch64 — verify at M0. Th
 
 ## 12. Art direction
 
-Canonical references, in `specification/art/`:
+Canonical references, in `specification/art/`. The delivered asset pack in `specification/art/h11v/` realizes them in 32x32 and is canon for the pixels themselves:
 
 - `ref-01-h11-event.png` — a mutation cycle rollover. Canonizes two distinct cards: the centred **H11 event card** (hex glyph, title, cycle N → N+1, "mutation detected") and a separate **world-change card** at mid-right (a before → after block pair plus a one-sentence note). Also: the H11 hex-cluster glyph, glowing glyph stencils on mutated blocks, H11V banner posts in the world, the top-right cycle counter and clock, the three bot status bars, the bottom-left state line (`H11 // MUTATION ACTIVE`), and the 8-slot hotbar with counts.
 - `ref-02-bot-echo.png` — the bot panel. Canonizes: ECHO's look (ivory rounded quadruped, black face screen with cyan eyes, amber accents, unit number on the chest), the panel layout (name, BOT NN, state, three needs bars, intent line), the E Observe / R Follow interactions, and `H11 // STABLE`.

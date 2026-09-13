@@ -5,6 +5,7 @@
 #   tools/deploy_to_term35.sh --profile=low   pick the graphics profile (low|mid|high)
 #   tools/deploy_to_term35.sh --fresh         delete the device world first
 #   tools/deploy_to_term35.sh --uncapped      lift fps_max (for measuring only)
+#   tools/deploy_to_term35.sh --trees=0.004   thin the forest (implies --fresh)
 #   tools/deploy_to_term35.sh --no-run        copy only, do not start
 #   tools/deploy_to_term35.sh --stop          stop whatever is running on the device
 #   tools/deploy_to_term35.sh --log           tail the game log on the device
@@ -27,12 +28,13 @@ GAME_SRC="$ROOT/games/h11v"
 REMOTE_DIR="h11v"
 PROFILE="mid"
 
-do_run=1 setup_key=0 stop_only=0 log_only=0 fresh=0 uncapped=0
+do_run=1 setup_key=0 stop_only=0 log_only=0 fresh=0 uncapped=0 trees=""
 for arg in "$@"; do
 	case "$arg" in
 		--profile=*) PROFILE="${arg#*=}" ;;
 		--fresh) fresh=1 ;;
 		--uncapped) uncapped=1 ;;
+		--trees=*) trees="${arg#*=}"; fresh=1 ;;
 		--no-run) do_run=0 ;;
 		--setup-key) setup_key=1 ;;
 		--stop) stop_only=1 ;;
@@ -187,6 +189,13 @@ trap 'rm -f "$CONF_TMP"' EXIT
 		echo
 		echo "# --uncapped: measurement only, not a shipping value"
 		echo "fps_max = 250"
+	fi
+	# Decorations are placed at generation, so this only takes effect on a world
+	# that does not exist yet — hence --trees implying --fresh.
+	if [ -n "$trees" ]; then
+		echo
+		echo "# --trees: inspection only, not a shipping value"
+		echo "h11v_tree_density = $trees"
 	fi
 } > "$CONF_TMP"
 

@@ -136,6 +136,10 @@ core.set_mapgen_setting_noiseparams("mgv7_np_terrain_base", {
 -- No leafdecay either. That is a per-tick ABM over every leaf in view, and v0
 -- exists to learn what the device does with the simple case first.
 
+-- The shipped density. tools/deploy_to_term35.sh --trees=N overrides it for a
+-- look at the terrain; the gate's "trees >= 20" is measured against the default.
+local TREE_DENSITY = tonumber(core.settings:get("h11v_tree_density")) or 0.032
+
 local _ = "air"      -- readability in the layer tables below
 local T = "h11_world:trunk"
 local L = "h11_world:leaves"
@@ -203,7 +207,12 @@ core.register_decoration({
 	-- Tuned for a wooded island rather than a forest or a lawn: dense enough that
 	-- the 128x128 map clears the DoD's 20 trees with room to spare, sparse enough
 	-- that the player can see across it.
-	fill_ratio = 0.032,
+	-- Overridable so the terrain can be inspected without editing the shipped
+	-- value. Judging the SHAPE of the world — how far it runs, how tall the hills
+	-- are, whether 128x128 feels like a place — is impossible from inside a
+	-- forest, and the honest way to get that look is a setting rather than a
+	-- commit that has to be remembered and reverted.
+	fill_ratio = TREE_DENSITY,
 	y_max = 200,
 	y_min = 7,          -- above the water line: no trees standing in the sea
 	schematic = tree,

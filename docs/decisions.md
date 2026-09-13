@@ -181,3 +181,24 @@ terrain shape.
 **Why:** a 128×128 pocket world needs one number a designer can turn, not three interacting ones
 tuned for an endless continent. With water level 6, offset 12 and scale 12 give elevation range 19,
 turf on 93% of sampled columns and water on 7% — lakes and a shoreline rather than a lawn or a swamp.
+
+### 2026-09-13 — The world is still unbounded, and "exactly 128×128" is not available
+
+VISION asks for "a single map on the order of 128×128 blocks, no infinite generation". The engine
+setting for that is `mapgen_limit`, a radius in nodes — but **only mapchunks lying completely within
+the limit are generated, and a mapchunk is 80 nodes.** So `mapgen_limit = 64` generates a single
+central mapchunk: an **80×80** world, not 128×128. Measured, not reasoned: the worldgen probe's
+sampled columns fell from 1024 to 400, exactly the 0.625 span ratio that implies, and the tree count
+fell below the DoD's threshold with it.
+
+The available sizes are therefore quantised to mapchunks — 80×80, 240×240, and so on — and 128×128 is
+not among them.
+
+**Decision: leave the world unbounded through v0.** A boundary is not in any v0 phase's DoD; v0 exists
+to measure the device. Introducing one now would mean either shipping an 80×80 world that contradicts
+the specification, or a 240×240 one that contradicts it in the other direction, and silently
+rewriting a released phase's acceptance numbers to match whichever was chosen.
+
+**Owed to v1**, where the world's size is a genuine design question rather than a setting: pick
+80×80 or 240×240 (or a soft barrier at 128 inside a larger generated region), update VISION to the
+number actually chosen, and re-derive the gate's density thresholds from it.

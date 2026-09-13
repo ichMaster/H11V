@@ -87,7 +87,7 @@ Pathfinding uses the stock `core.find_path`; perception reads the real nodes aro
 - **M1** — `h11_world` grows up: three biomes, first mutation cycle on ABMs, cycle HUD, saved log (the 8 block types and the terrain already land in M0).
 - **M2** — bots: body + StubBrain ported to Lua, three visible bots reacting to world mutations.
 - **M3** — `brain/` service on the LAN with per-bot character prompts, HTTP bridge, StubBrain fallback.
-- **M4** — player tools for influencing mutations, conversation with bots, catching up missed cycles after shutdown (open).
+- **M4** — player tools for influencing mutations (the anchor is a quarantine boundary the infection cannot cross), conversation with bots. Catching up missed cycles is **settled**: it is not replayed — the mutation frontier is a pure function of position, cycle and seed, so a block loading after a week away computes its current state in one step (ARCHITECTURE.md §Mutation is an infection).
 
 ## Device constraints that affect every feature
 

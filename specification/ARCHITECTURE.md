@@ -21,6 +21,11 @@ a world that edits itself) and **the inhabitants** (nothing → three rule-drive
 a language model behind them). They are bound by the `Perception → Intent` contract, which neither
 axis is allowed to change alone.
 
+A model touches this architecture at exactly two seams, and both are data: it answers
+`Perception → Intent` to move a bot, and it emits a **plan** over the build catalogue to make
+something. It never writes Lua, never writes to the map database, and never emits a coordinate it had
+to count out itself.
+
 ## Engine primitives we build on
 
 | Need | Luanti primitive |
@@ -30,6 +35,11 @@ axis is allowed to change alone.
 | Structural mapgen wiring | aliases `mapgen_stone`, `mapgen_water_source`, `mapgen_river_water_source` |
 | Trees | `core.register_decoration` with a Lua-table schematic |
 | World mutation | Active Block Modifiers (`core.register_abm`) and LBMs |
+| Contact spread | the ABM's own `neighbors` / `without_neighbors` fields — "only next to something already infected" is a field, not a search |
+| Catching up while unloaded | `core.register_lbm`, which the engine tracks per world in `env_meta.txt`'s `lbm_introduction_times` |
+| Authoring a part | `core.create_schematic` captures a built volume to `.mts` |
+| Placing a part | `core.place_schematic` — `rotation` gives four orientations from one file, `replacements` re-materialises the same shape in another block set |
+| Bulk edits | VoxelManip: read a region, edit a flat array of content ids, one `write_to_map` |
 | Bots | `core.register_entity` with a custom `on_step` |
 | Bot pathfinding | `core.find_path` |
 | Persistent state | mod storage |
@@ -52,6 +62,10 @@ axis is allowed to change alone.
 - **`h11_bots`** (from v2) — the bodies. Split the way the logic is: `body`, `needs`, `intent`,
   `perception`, plus a rule-based StubBrain in Lua so the bots live without a network. Each bot's
   character is its needs weighting, a row in a table.
+- **`h11_build`** (from v2) — the catalogue and the builder. `catalogue.lua` is the data table of
+  parts; `ops.lua` expands a plan into nodes; `registry.lua` keeps what has been placed; `undo.lua`
+  captures each affected region before it is written. It is the only module that writes nodes in bulk,
+  and the only one a model ever addresses. See **The build catalogue** below.
 - **`h11_hud`** (from v1) — the cycle number, the H11 event card, the world-change card, and from v2
   the bot panels and the Observe/Follow interactions.
 - **`brain/`** (from v3) — a small Python HTTP service, one endpoint `POST /decide`, running on a
@@ -97,6 +111,92 @@ body (fast ticks)  ──Perception──>  brain  ──Intent──>  body
   picks the answer up on a later step. A bot tick never blocks on the network, and with no server
   the bots fall back to the StubBrain. This is what makes the v3 swap free: the same contract is
   answered by a Lua table and by a language model.
+
+## The build catalogue
+
+The second contract a model answers, and the reason a model can build at all.
+
+**A model does not emit blocks.** Asked for a station it would have to produce tens of thousands of
+coordinates, which it cannot do reliably — it loses count and drifts, and the answer is enormous. So
+it emits a **plan**: thirty lines in a small vocabulary, which deterministic Lua expands into nodes.
+This is the same split as everywhere else here — description is data, execution is code — and it puts
+the model where it is strong (composition, proportion, intent) and keeps it away from arithmetic.
+
+The vocabulary has two levels, and both are needed:
+
+- **Primitives** — `box`, `dome`, `wall`, `stairs`, `lamps`. Flexible, plain, for terrain and filler.
+- **Parts** — authored `.mts` schematics, built by hand in-game and captured with
+  `core.create_schematic`. Quality is guaranteed by whoever authored them, not by the model.
+
+A part carries **sockets**: `{at, dir, type}`. With sockets a plan contains no coordinates at all —
+`attach habitat_a to hub_core.socket[1]` — so stacking, rotation and offset are computed by Lua and
+cannot drift. Ten good parts give thousands of stations; three give three.
+
+### The part registry
+
+One structure in mod storage, and the thing that makes the rest of this document possible:
+
+```
+{ id, part, pos, rot, material, sockets_used, born_cycle, last_mutated_cycle }
+```
+
+It is cheap — hundreds of rows, not millions — and it buys four things that are otherwise out of
+reach: **undo** (without which an experimenting agent cannot be given any freedom), **a world the
+model can be told about** ("one hub, three habitats, two free sockets"), **an event card that names
+what changed**, and, above all, **something with an identity for H11 to act on**.
+
+### Validation is mandatory
+
+A plan is untrusted input, exactly like an `Intent`. Before anything is written: every node name must
+exist in `core.registered_nodes`, the bounding volume must lie inside the world, and the node count
+must be computed and capped. A model that is wrong by an order of magnitude asks for ten million
+blocks, and the engine will honestly try.
+
+## Mutation is an infection
+
+H11 is not a per-block dice roll. It is an **infection spreading from a focus**, and that framing is
+what gives several loose pieces a mechanic:
+
+| | |
+| --- | --- |
+| **susceptibility** | a per-material rate — crystal spreads fast, colony hull resists — so what the player builds with is a decision |
+| **incubation** | the H11 stencil appears before the material changes: a warning, and something for the event card to carry |
+| **quarantine** | the v4 anchor is a boundary contact cannot cross, not merely a suppression percentage |
+| **a visible frontier** | the player can watch it approach, build away from it, or build against it |
+
+### The frontier is maths; the detail is ABMs
+
+The one structural conflict, and its resolution. **ABMs run only on loaded blocks.** Contact spread
+alone would therefore advance the infection only where the player is standing — run away and it
+freezes, come back and it resumes. That breaks the fiction and determinism together.
+
+So the two levels are separated:
+
+- **The frontier is a pure function**: `infected(pos, cycle) = dist(pos, focus) < r(cycle) + noise(pos)`.
+  It needs no loaded map, answers for any point at any time, and does not care where the player has
+  been.
+- **The detail is ABMs**, working *inside* a boundary that has already been decided. Contact spread
+  survives as local drawing — which block, which glyph, which crack — never as the thing that computes
+  the boundary.
+
+### Determinism is the invariant
+
+Because evaluation is lazy, a result must not depend on when the player walked past. Every rule is a
+pure function of `(state, cycle, seed)` — `hash(part_id, cycle, seed) < threshold`, never a per-tick
+dice roll. Otherwise two players with the same seed get different worlds, and the cycle log describes
+something that never happened.
+
+This also answers what the vision listed as open: **missed cycles are not replayed**. A block loading
+after a week away computes its current state from the frontier function in one step.
+
+### Two rules of restraint
+
+**Mutate few things per cycle.** Forty changes read as noise; one reads as an event — which is why the
+reference art's `WORLD CHANGE` card shows a single change, and why the HUD can afford to name it.
+
+**Never re-place a schematic over a part.** Players extend what they build by hand, and overwriting
+that reads as a bug, not as an event. Mutation edits nodes **in place**, touching only those that
+still match the part's original schematic. Old blocks stay; changed ones carry the H11 stencil.
 
 ## The GPU path
 
@@ -202,6 +302,8 @@ that line, applies the phase's thresholds and exits 0 or 1. The game itself cont
 games/h11v/            the Luanti game — game.conf, menu/, screenshot.png, mods/
   mods/h11_world/      nodes, mapgen, player (v0); biomes and the mutation cycle (v1)
   mods/h11_bots/       bodies + StubBrain (v2)
+  mods/h11_build/      part catalogue, plan ops, placed-part registry, undo (v2)
+    schematics/        the authored .mts parts — the catalogue's content
   mods/h11_hud/        cycle HUD, event cards, bot panels (v1-v2)
 brain/                 Python brain service for the LAN machine (v3)
 tools/                 device profiles, deploy, run, and the acceptance runners

@@ -6,15 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repo is **specification-only** — no code exists yet. Tracked files are `LICENSE` and a stock Python `.gitignore` (note: the game itself is Lua, not Python); everything else lives in [specification/](specification/). Single commit on `main`; no bot or brain code exists anywhere and none is carried in — it gets written fresh at M2/M3.
 
-The specs are the source of truth and are kept in English under `specification/eng/`; `specification/ukr/` is a maintained Ukrainian mirror of them (re-translate it whenever the English changes — English wins on any disagreement), canonical art references in `specification/art/`:
+The specifications are the source of truth and live flat in [specification/](specification/), English
+only:
 
-- [specification/eng/H11V-CONCEPT.md](specification/eng/H11V-CONCEPT.md) — the full brief: concept, engine decision, architecture, milestones, out-of-scope list, decisions taken (§10), still-open questions (§11), art direction (§12), and working rules for Claude Code (§13).
-- [specification/eng/H11V-M0-SPEC.md](specification/eng/H11V-M0-SPEC.md) — the concrete M0 milestone spec: scope, components, graphics-profile protocol, project structure (§7), architecture (§8), implementation plan (§9).
-- [specification/eng/H11V-M0-DESIGN-BRIEF.md](specification/eng/H11V-M0-DESIGN-BRIEF.md) — the asset order for Claude Design: exact filenames/sizes are a contract with the code.
-- `specification/art/ref-01-h11-event.png`, `ref-02-bot-echo.png`, `ref-03-anchor-biomes.png` — canonical art (concept §12 says what each canonizes).
-- `specification/art/h11v/` — **the delivered M0 asset pack** (22 textures, 3 menu images, screenshot), audited and accepted. It mirrors `games/h11v/` exactly, so installing is `rsync -a specification/art/h11v/ games/h11v/` followed by a metadata strip (M0 spec §8). Treat it as the delivery of record: edit the game's copy, never this one.
-
-Re-read both, plus `docs/decisions.md` once it exists, before starting a milestone.
+- [VISION.md](specification/VISION.md) — what this is, for whom, the principles, the arc, what is
+  deliberately not built, and the three still-open questions.
+- [ARCHITECTURE.md](specification/ARCHITECTURE.md) — the engine/data/mods split, the Luanti
+  primitives we stand on, three engine strictnesses that fail *silently*, the `Perception → Intent`
+  contract, the GPU path, and **the five acceptance gates**.
+- [ROADMAP.md](specification/ROADMAP.md) — v0–v4, each phase with Goal / Tasks / DoD / Tests. v0 is
+  the device milestone, phase by phase.
+- [SDLC.md](specification/SDLC.md) — how a roadmap phase becomes shipped code: the ten skills, the
+  gates, issue identity, and the `codegen/` instrumentation.
+- [ART.md](specification/ART.md) — part one the art canon, part two the asset-pack contract and the
+  delivery audit. Filenames and sizes there are a contract with the code.
+- `specification/art/` — the three canonical reference images plus `h11v/`, the delivered asset pack.
+- `specification/implementation/` — per-version issue and execution reports, written by the skills.
 
 ## What H11V is
 
@@ -45,15 +52,18 @@ Luanti is **not currently installed on the Mac** — installing it (and on the P
 ## Planned layout
 
 ```
-games/h11v/            Luanti game (game.conf, menu/ art, mods/)
-  mods/h11_world/      blocks (NODES data table), mapgen aliases, player layer (M0);
-                       biomes + mutation cycle + log (M1); textures/ = designed pack
-  mods/h11_bots/       bot bodies + Lua StubBrain (M2)
-  mods/h11_hud/        cycle HUD, bot panels (M1-M2)
-brain/                 Python HTTP brain service for the LAN server (M3)
-specification/         eng/ (specs, source of truth), ukr/ (Ukrainian mirror), art/
-tools/                 run_local.sh, run_on_pi.sh, deploy_to_pi.sh, test_worldgen.sh,
-                       device/minetest.conf + device-{low,mid,high}.conf
+games/h11v/            the Luanti game — game.conf, menu/, screenshot.png, mods/
+  mods/h11_world/      nodes.lua (the NODES table), mapgen.lua, player.lua (v0);
+                       biomes + mutation cycle (v1); textures/ = the installed pack
+  mods/h11_bots/       bodies + Lua StubBrain (v2)
+  mods/h11_hud/        cycle HUD, event cards, bot panels (v1-v2)
+brain/                 Python HTTP brain service for the LAN machine (v3)
+tools/                 the acceptance runners, device profiles and deploy
+  check_lua.sh  test_worldgen.sh  check_assets.py  strip_png_metadata.py
+  run_local.sh  run_on_pi.sh  deploy_to_term35.sh
+  device/              minetest.conf + device-{low,mid,high}.conf
+specification/         VISION, ARCHITECTURE, ROADMAP, SDLC, ART, art/, implementation/
+codegen/               pipeline instrumentation — tracker, hook, dashboard, tests
 docs/                  decisions.md, device/ (fps notes, screenshots)
 ```
 
@@ -85,13 +95,22 @@ Render at native 640x480, **always hardware-accelerated**: Mesa V3D via GL ES (`
 
 ## Working rules
 
-- Each milestone ends with a **headless acceptance test runnable by one command from `tools/`**. For M0 that is `tools/test_worldgen.sh`: start `luantiserver` with the game, emerge a 128x128 area, assert height variation ≥ 8 blocks, water present, ≥ 20 trees, exit 0.
-- Small commits, one per step of the spec's work order. **Commit messages in English**; README and the player guide in **Ukrainian**.
+- **Work runs through the pipeline in [SDLC.md](specification/SDLC.md).** `/ship-phase v0.2` drives a
+  roadmap phase end to end; the ten skills in `.claude/skills/` are also usable singly. One issue,
+  one commit. Issue ids are `H11V-###`, globally sequential, never reset.
+- **The five gates** ([ARCHITECTURE.md](specification/ARCHITECTURE.md) §Acceptance and testing):
+  `tools/check_lua.sh` and `tools/test_worldgen.sh` run for *every* issue; `tools/check_assets.py`
+  whenever art changed; `tools/run_local.sh` whenever anything visible changed; and a device run
+  whenever a frame-rate budget is claimed. Never commit on a red gate.
+- **Commit messages in English**; README and the player guide in **Ukrainian**.
+- **Credentials never enter the repository.** The device's ip, user and password live in
+  `.term35-connect.txt` (gitignored); `tools/deploy_to_term35.sh` reads it at run time and never
+  echoes it. The `codegen/` hook is forbidden from recording raw command strings for the same reason.
 - Do not add mechanics from the out-of-scope list (concept §8): infinite world, crafting recipes, hostile mobs, combat, multiplayer, custom renderer.
 - The project stands alone: do not pull code, prompts, or assets in from other repositories.
 - Media assets must be self-made or CC0. Luanti is LGPL; the game mods carry their own license.
 - Known risk to verify early: Luanti touch input had a regression in 5.8 on aarch64.
 
-## Open questions (concept §11)
+## Open questions
 
-Three remain, none blocking M0: how long one mutation cycle lasts in real time (minutes vs hours/days); which local model runs on the brain server and whether it has a GPU; and whether Lua code is English with Ukrainian READMEs (the specs are English with a Ukrainian mirror in `specification/ukr/`; the README and player guide are still open). Art direction, texture resolution, asset sourcing and the bots' names/needs were settled on 13.09.2026 — see concept §10 and §12. Ask rather than assume when work touches the open three; record answers in `docs/decisions.md`.
+Three remain, none blocking v0, and [VISION.md](specification/VISION.md) §Still open is their home: how long one mutation cycle lasts in real time; which local model runs on the brain server and whether it has a GPU; and whether the README and player guide stay Ukrainian while code and specs are English. Art direction, texture resolution, asset sourcing and the bots' names/needs are settled — see [ART.md](specification/ART.md). Ask rather than assume when work touches the open three; record answers in `docs/decisions.md`.

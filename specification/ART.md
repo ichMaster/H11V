@@ -1,8 +1,37 @@
-# H11V — design brief for Claude Design: the M0 asset pack
+# Art — H11V
 
-> **Status: delivered and accepted, 13 September 2026.** The pack is in `specification/art/h11v/`. Section 9 records the audit against this brief and the three deltas worth knowing. This brief stays the contract — re-deliveries must still satisfy it.
+Two halves. **Part one** is the art direction: the canon this project's look must obey, fixed by the
+three reference images in `art/`. **Part two** is the design brief that was sent to Claude Design to
+produce the v0 asset pack — exact filenames, sizes and export rules, which are a contract with the
+code — plus the audit of what came back.
 
-This brief is for Claude Design. It orders every visual asset the M0 milestone of H11V needs, with exact filenames, sizes and formats. The engineering context lives in [H11V-M0-SPEC.md](H11V-M0-SPEC.md); the world and art canon in [H11V-CONCEPT.md](H11V-CONCEPT.md), section 12. Where this brief fixes a filename or size, it is a contract with the code — deliver exactly that.
+Part one governs. Part two is how it was realised for v0 and the template for every later order.
+
+---
+
+# Part one — art direction
+
+Canonical references, in `art/`. The delivered asset pack in `art/h11v/` realizes them in 32x32 and is canon for the pixels themselves:
+
+- `ref-01-h11-event.png` — a mutation cycle rollover. Canonizes two distinct cards: the centred **H11 event card** (hex glyph, title, cycle N → N+1, "mutation detected") and a separate **world-change card** at mid-right (a before → after block pair plus a one-sentence note). Also: the H11 hex-cluster glyph, glowing glyph stencils on mutated blocks, H11V banner posts in the world, the top-right cycle counter and clock, the three bot status bars, the bottom-left state line (`H11 // MUTATION ACTIVE`), and the 8-slot hotbar with counts.
+- `ref-02-bot-echo.png` — the bot panel. Canonizes: ECHO's look (ivory rounded quadruped, black face screen with cyan eyes, amber accents, unit number on the chest), the panel layout (name, BOT NN, state, three needs bars, intent line), the E Observe / R Follow interactions, and `H11 // STABLE`.
+- `ref-03-anchor-biomes.png` — the H11 anchor and the mutated biome. Canonizes: the anchor device and its suppression-dome rendering, the anchor card (suppression %, radius), and the mutated-biome look — pale lithic structures and lilac crystal growth replacing the green biome.
+
+**Palette.** Bright and luminous, never grim: vivid greens and warm browns for the living biome; ivory and warm pale grey for stone and lithic growth; pale warm sand; teal-cyan luminous water; a lilac-lavender family for everything mutation has touched; bright sky with soft clouds. Accents: cyan (BOT 01, HUD primary), amber (BOT 02, highlights), green (BOT 03, positive state). HUD panels are dark translucent glass with thin light borders, so the bright world shows through.
+
+**Type and HUD.** Monospaced, all-caps, generously tracked HUD text, as in the references. Screen-relevant sizes only: everything must survive 640x480 at 3.5 inches — minimum UI element 48 px, no hairline strokes.
+
+**The H11 glyph language.** H11 marks everything it has touched: a hex-cluster logo glyph, and small circuit-like stencil glyphs etched into mutated blocks with a faint cyan-to-lilac glow. Glyphs are decoration with meaning — they signal "changed by H11", never mere noise.
+
+**The player.** Present in the world as an ivory gauntlet with medium-blue accents and a dark grey band (first-person hand), kin to the bots' design language — the player is a unit in the same ecosystem, not an outsider. The blue is the references' own hand colour (around `#6E8AB8`) and is deliberately *not* the HUD cyan: the interface glows cyan, the player's body does not.
+
+**Aspirational vs literal.** The references show floating islands, waterfall cliffs and spiral megastructures; on the device those read as skybox mood and distant vista, not literal terrain — the playable map stays the 128x128 pocket world. UI cards, palette, bot design and glyphs are literal canon.
+
+---
+
+# Part two — the v0 asset pack
+
+This brief is for Claude Design. It orders every visual asset the M0 milestone of H11V needs, with exact filenames, sizes and formats. The engineering context lives in [ROADMAP.md](ROADMAP.md); the world and art canon in part one above. Where this brief fixes a filename or size, it is a contract with the code — deliver exactly that.
 
 ## 1. The game, in one breath
 
@@ -12,7 +41,7 @@ The game renders on a 3.5-inch 640x480 touchscreen (Raspberry Pi 5 handheld). Ev
 
 ## 2. Canonical references
 
-Three images in `specification/art/` are canon. Match their light, palette and UI voice:
+Three images in `art/` are canon. Match their light, palette and UI voice:
 
 - `ref-01-h11-event.png` — mutation-event moment: glyph-etched stone spreading through grass, the H11 event card, hotbar, bot markers.
 - `ref-02-bot-echo.png` — bot ECHO close up: ivory rounded robot, black face screen, cyan eyes, amber accents; the bot panel UI.

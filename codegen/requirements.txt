@@ -1,0 +1,19 @@
+# Dependencies for the DASHBOARD, the BRIDGE, and the TEST SUITE.
+#
+# codegen/tracker/ and codegen/hooks/ must import NONE of these. They run inside
+# the pipeline, on its critical path, and an emitter that cannot import is an
+# emitter that can break a build (architecture.md §5.2). They are stdlib-only,
+# and a test asserts it.
+#
+# codegen/dashboard/ is exempt: it is a separate process started deliberately and
+# is not on the pipeline's critical path. (H11 also had codegen/bridge/, a
+# Bluetooth run-status bridge; it was not imported here, so neither is bleak.)
+#
+# Install into a venv of your own; never into the generated project's, and never
+# via the repo-root pyproject.toml, which the pipeline regenerates.
+
+fastapi
+uvicorn
+websockets
+pytest
+httpx        # starlette's TestClient imports it; dashboard tests only

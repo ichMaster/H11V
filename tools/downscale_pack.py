@@ -4,13 +4,26 @@
     tools/downscale_pack.py games/h11v          halve in place
     tools/downscale_pack.py --dry-run <path>    report what would change
 
-The art is authored at 32x32 and ships at 16x16. That is deliberate rather than a
-compromise: the delivered pack is drawn in roughly 2-pixel clusters, so taking
-every other pixel reproduces the artist's intent exactly instead of approximating
-it — verified by eye before this tool was written, and the H11 glyph on the crust
-block is arguably crisper at 16 than at 32. Keeping the 32x32 set as the master
-means an HD pack costs nothing later, and a re-delivery does not have to be
-redrawn at a second size.
+The art is authored at 32x32 and ships at 16x16 — a judgement about how the game
+should look, not a technical win. Both claims that were first made for it turned
+out to be false when measured, and are recorded here so they are not made again:
+
+  * "the pack is drawn in 2-pixel clusters, so halving loses nothing" — only 44%
+    of its 2x2 blocks are uniform. Over half the detail is real, and halving
+    discards it.
+  * "16x16 shimmers less at distance" — it does not. Nearest-neighbour halving
+    does not smooth anything; it moves the same hard edges onto a smaller grid,
+    and point-sampling six screen pixels out of sixteen texels crawls just as
+    much as six out of thirty-two. Measured at both near and far block sizes: the
+    difference is inside the noise.
+
+What is left is the real reason: 16x16 is the resolution the voxel idiom is
+written in, and on a 3.5-inch panel the question is whether the extra detail of
+32x32 reads as texture or as noise. That is an eye question, answered on the
+device.
+
+Performance is not a factor either way — the device draws a frame in 2-3 ms of a
+33 ms budget at both sizes.
 
 **Node textures only.** UI art (the hotbar, its selection frame, the crosshair)
 and the first-person hand are sized in screen pixels or extruded into a mesh;

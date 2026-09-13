@@ -300,10 +300,24 @@ Supersedes "Bright-luminous art canon, 32x32, designed pack only" (13 September)
 only. The palette, the designed-pack-only rule and the bot canon are unchanged.
 
 Node textures are halved 2:1 from the authored 32x32, nearest-neighbour, by
-`tools/downscale_pack.py`. Verified by eye before it was adopted: the pack is drawn in roughly
-2-pixel clusters, so taking every other pixel reproduces the art rather than approximating it, and
-the H11 glyph on the crust block is if anything crisper at 16. UI art and the hand are not scaled —
-they are sized in screen pixels or extruded into a mesh.
+`tools/downscale_pack.py`. UI art and the hand are not scaled — they are sized in screen pixels or
+extruded into a mesh.
+
+**Two arguments were offered for this and both are false.** They are recorded because they are the
+arguments anyone would reach for again:
+
+- *"The pack is drawn in 2-pixel clusters, so halving loses nothing."* Measured: only **44%** of its
+  2x2 blocks are uniform. Over half the detail is real, and halving discards it.
+- *"16x16 shimmers less at distance."* Measured at both near and far block sizes: **no difference**,
+  inside the noise. Nearest-neighbour halving smooths nothing — it moves the same hard edges onto a
+  smaller grid, and sampling six screen pixels out of sixteen texels crawls exactly as much as six
+  out of thirty-two.
+
+Performance is not a factor either: 2-3 ms of a 33 ms budget at both sizes.
+
+**So the real reason is aesthetic**, and it is the only one that should be cited: 16x16 is the
+resolution the voxel idiom is written in, and whether 32x32's extra detail reads as texture or as
+noise on a 3.5-inch panel is a question the panel answers.
 
 **This is explicitly reversible and is not yet closed.** `tools/install_assets.sh --res=32` puts the
 authored resolution back in one command: the delivery of record in `specification/art/h11v/` is never

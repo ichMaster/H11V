@@ -138,11 +138,15 @@ That is the whole install and the whole rollback: it rsyncs the pack in, halves 
 unless `--res=32`, and strips the content-credential metadata every delivered PNG carries — 146 KiB
 across the pack, up to 97% of a single file, crossing the network on every deploy.
 
-**Node textures are authored at 32x32 and ship at 16x16.** The delivered pack is drawn in roughly
-2-pixel clusters, so taking every other pixel reproduces the artist's intent rather than
-approximating it; the H11 glyph is if anything crisper at 16. Keeping the 32x32 set as the master
-means an HD pack costs nothing later and a re-delivery need not be redrawn twice. UI art and the
-first-person hand are **not** scaled — they are sized in screen pixels or extruded into a mesh.
+**Node textures are authored at 32x32 and ship at 16x16** — an aesthetic choice, not a technical one.
+Halving does discard real detail (only 44% of the pack's 2x2 blocks are uniform), and it does **not**
+reduce shimmer at distance (measured: the difference is inside the noise, because nearest-neighbour
+halving moves the same hard edges onto a smaller grid rather than smoothing them). Performance is
+identical: 2-3 ms of a 33 ms budget either way. What remains is that 16x16 is the resolution the
+voxel idiom is written in, and whether 32x32's extra detail reads as texture or as noise at 3.5
+inches is a question for the panel. Keeping the 32x32 set as the master means the decision stays
+reversible. UI art and the first-person hand are **not** scaled — they are sized in screen pixels or
+extruded into a mesh.
 
 `tools/check_assets.py` detects the installed resolution rather than being told it, so the gate
 follows the choice automatically and a half-finished install (node textures disagreeing with each

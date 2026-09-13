@@ -11,13 +11,12 @@
 --   player   the hand, the starting inventory, the spawn and the HUD. Last,
 --            because it hands the player blocks that nodes.lua defined.
 --
--- See specification/ARCHITECTURE.md §Components. The modules arrive in v0.2
--- (nodes, mapgen) and v0.5 (player); until then this file registers nothing,
--- which is a complete and valid Luanti game — just an empty one.
+-- See specification/ARCHITECTURE.md §Components. mapgen arrives later in v0.2,
+-- player in v0.5.
 
 local modpath = core.get_modpath(core.get_current_modname())
 
--- dofile(modpath .. "/nodes.lua")     -- v0.2
+dofile(modpath .. "/nodes.lua")
 -- dofile(modpath .. "/mapgen.lua")    -- v0.2
 -- dofile(modpath .. "/player.lua")    -- v0.5
 

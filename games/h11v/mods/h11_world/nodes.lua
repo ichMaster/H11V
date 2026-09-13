@@ -196,7 +196,11 @@ end
 
 core.log("action", ("[h11_world] registered %d nodes"):format(#NODES))
 
--- Exported so mapgen.lua can address the catalogue by id, and so v1's rules
--- table has something to be written against. The only global this mod defines.
-h11_world = h11_world or {}
-h11_world.NODES = NODES
+-- Exported so mapgen.lua can address the catalogue by id, and so v1's rules table
+-- has something to be written against. The only global this mod defines.
+--
+-- Assigned, not read-then-assigned. `h11_world = h11_world or {}` reads a global
+-- that does not exist yet, and Luanti's strict-global check warns about exactly
+-- that — a warning in the log costs more than it looks, because the next real one
+-- arrives in a file someone has learned to skim.
+h11_world = { NODES = NODES }

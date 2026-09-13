@@ -151,8 +151,12 @@ local tree = {
 	data = {},
 }
 
--- Layers are built bottom-to-top, and within a layer row-by-row on z then x,
--- which is the order the engine reads `data`.
+-- ORDER MATTERS AND IS NOT THE OBVIOUS ONE. A schematic's `data` is a flat array
+-- the engine reads as [z [y [x]]] — z outermost, x innermost. Building it
+-- layer-by-layer (y outermost), which is how a human thinks about a tree, writes
+-- every node to the wrong coordinate: the result generates without error and
+-- looks like trunks floating beside their own canopies. Found by screenshotting
+-- the device, because nothing in a log or a block count can see it.
 local layers = {
 	-- y = 0..2: the trunk alone
 	{ pattern = "trunk" }, { pattern = "trunk" }, { pattern = "trunk" },
@@ -164,8 +168,8 @@ local layers = {
 	{ pattern = "cap" },
 }
 
-for _y, layer in ipairs(layers) do
-	for z = 1, 5 do
+for z = 1, 5 do
+	for _y, layer in ipairs(layers) do
 		for x = 1, 5 do
 			local centre = (x == 3 and z == 3)
 			local inner = (math.abs(x - 3) <= 1 and math.abs(z - 3) <= 1)
@@ -199,7 +203,7 @@ core.register_decoration({
 	-- Tuned for a wooded island rather than a forest or a lawn: dense enough that
 	-- the 128x128 map clears the DoD's 20 trees with room to spare, sparse enough
 	-- that the player can see across it.
-	fill_ratio = 0.012,
+	fill_ratio = 0.032,
 	y_max = 200,
 	y_min = 7,          -- above the water line: no trees standing in the sea
 	schematic = tree,

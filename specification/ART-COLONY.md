@@ -351,3 +351,56 @@ one:
 
 Worlds generated before the rename will not survive it. That is acceptable and expected: v0's world
 is a test fixture, not a save worth keeping.
+
+---
+
+## 11. Delivery audit — 14 September 2026
+
+Accepted after two revisions. 44 files: the 21 ordered textures, the 6 optional glyphs, the 3 menu
+images, `screenshot.png`, and 13 unordered extras that are welcome
+(`h11_creep`, `h11_needle`, `h11_lattice`, `h11_pod`, `h11_frond`, `h11_tuft`, `h11_shelf`,
+`h11_stem`, `h11_lithic_top`, `h11_lava`, and three `_alt` variants).
+
+Verified programmatically against §5.1 and §4.1, not by eye alone.
+
+| Check | Result |
+| --- | --- |
+| Filenames and sizes vs §6 | all match, including the optional glyph set |
+| Alpha regimes vs §5.1 | exactly as specified — terrain opaque, bloom/scanner/crosshair/glyphs binary, meltwater partial |
+| Rule 1, the value ladder | **holds at every step**: hull 86.8 → drift 77.9 → regolith 69.7 → prefab 58.7 → fines 50.4 → lithic 42.0, steps of 8.8 · 8.2 · 11.1 · 8.3 · 8.4 |
+| Rule 5, top brighter than side | 3 of 3 — regolith +16.2, spire +4.1, crate +10.0 |
+| Rule 2, hue spread | 7 formal collisions, **none blocking** — see below |
+| PNG metadata | `caBX` content-credential chunks present; `tools/strip_png_metadata.py` removes them at install, as it did for the v0 pack |
+
+**The seven collisions, each checked rather than counted.** Three are solved by chroma
+(`regolith_top`↔`spire_side`/`spire_top` sit at the same lightness but at ΔC 26–30 — pale ground
+against vivid crystal; `lithic`↔`bloom` at ΔC 51). One is solved by the engine: `lithic`↔`beacon` is
+a real match on paper, but the beacon is a `light_source` and is therefore physically brighter than
+anything near it. Two are the two faces of one block. One — `fines`↔`regolith_side` — is required by
+the brief itself, since the side face *is* fines with a fringe.
+
+### What the two revisions changed, and what that says
+
+The pack arrived complete and technically perfect the first time, and was still wrong — which is the
+argument for §4.1 existing at all.
+
+| | delivered | after revision |
+| --- | --- | --- |
+| `regolith_top` | warm brown, hue 69, C 27 — soil with grass specks | hue 190, C 6.6 — a pale cool mineral crust |
+| `drift` | horizontal wood grain | smooth cream dust, no streaks |
+| `melt` | violet, hue 299 — the infection's own family, colliding with `fines` at ΔH 1 | hue 167, green-teal, clear of both violet and H11's cyan |
+| `lithic` | dark vertical bands: a plank | then cobblestone with mortar; finally hue 258, C 4.9, cool grey with open angular fractures |
+| `lithic_top` | cobblestone | the same fracture language as `lithic` |
+| `stem` | brown bark | violet with an internal vein — a stalk, not timber |
+| `spire_top` | 8.2 L* *darker* than its own flank | +4.1 brighter |
+| `crate_top` | +2.6 over its side — technically passing, visually thin | +10.0 |
+
+**The measurements found the palette problems; only looking found the material ones.** The value
+ladder was nearly correct in the first delivery while the ground was still recognisably Minecraft
+dirt, because a lightness ladder cannot see what a texture depicts. Both checks are needed, and the
+cheap one is not the sufficient one.
+
+**One deviation from the brief was accepted as better than the brief.** §4's sketch spent cyan on the
+terrain. The delivery reserves cyan entirely for the crystals and for H11, and gives the planet a
+warm-bone-to-violet range instead. That is a stronger reading of the fiction — the colour of the
+algorithm should not also be the colour of the ground — and it is now canon.

@@ -19,5 +19,6 @@ local modpath = core.get_modpath(core.get_current_modname())
 dofile(modpath .. "/nodes.lua")
 dofile(modpath .. "/mapgen.lua")
 dofile(modpath .. "/player.lua")
+dofile(modpath .. "/music.lua")
 
 core.log("action", "[h11_world] loaded from " .. modpath)

@@ -440,3 +440,73 @@ spreads. 12 rather than 14 keeps a mutated region reading as *glowing* rather th
 `[<0..23>:<0..59> | <0..24000>]`. So `/time 1400` is 01:24 in the morning, not two in the afternoon —
 which cost a confused minute on the device. `/time 14:00` is the form to use and the one to put in
 the player guide.
+
+---
+
+## v0.7.1 — Device fixes
+
+### 2026-09-13 — The gamepad buttons are keyboard keys, and the mapping came from H11
+
+Established on this hardware, not assumed: **every button sends an ordinary keyboard key.** There is
+no `BTN_*` anywhere, `/proc/bus/input/devices` lists no joystick, and the twelve gamepad codes the
+keyboard advertises in its capability bitmap are never used. So this is a keymap, and Luanti needs no
+joypad path at all.
+
+The codes were captured on this device by the sibling project H11 (its `ARCHITECTURE.md`) and
+confirmed here against the input device list:
+
+```
+A 30 · B 48 · X 45 · Y 21 · L 38 · R 19    each sends the letter on its own face
+Select 99 = SysRq (KEY_SNAPSHOT)   Start 119 = Pause (KEY_PAUSE)
+D-pad 103/108/105/106 = the arrow keys
+```
+
+**Luanti binds one key per action — there is no secondary binding** — so these *replace* the desktop
+keys rather than joining them. Hence `tools/device/gamepad.conf`, appended only by the device deploy
+and never by `run_local.sh`: on the panel the D-pad moves you, on the Mac W/A/S/D does. The same
+two-profile split H11 arrived at for the same reason.
+
+| | |
+|---|---|
+| D-pad | move |
+| A / B | jump / sneak |
+| X / Y | place / dig |
+| L / R | hotbar previous / next |
+| Select / Start | inventory / chat |
+
+A is jump without a collision precisely because A and D were *left* and *right* by default, and the
+D-pad has taken those. Escape is the pause menu and is not rebindable, so Start went to chat — which
+on this device is the only reason to want a keyboard mid-game (`/time`, `/music`).
+
+`keymap_rangeselect` was unbound from R in the base config: R is the right shoulder and belongs to
+`hotbar_next`. A silent binding conflict is worse than the harmless warning the engine logs about
+rangeselect having no key.
+
+### 2026-09-13 — A deploy must wait for the engine to exit, not just signal it
+
+**Luanti writes its settings back to the config file as it shuts down.** A deploy that swaps the file
+while the old process is still dying gets its new config overwritten by the old one's memory —
+silently, and with the comments preserved, so it looks like it worked.
+
+Diagnosed the hard way: a whole keymap block arrived on the device as comments with every setting
+stripped out, plus a `sound_volume = 1` nobody wrote. The deploy now waits for the process to be gone
+before swapping, with a SIGKILL escalation. `--stop` had already learned this lesson; the deploy path
+had not.
+
+### 2026-09-13 — The on-screen jump/sneak buttons: hidden, because 5.10 cannot move them
+
+They are drawn across hotbar slots 5-8. Three approaches were tried on the device:
+
+| approach | result |
+|---|---|
+| `texture_path` texture pack | does not override these textures at all |
+| replacing them in `/usr/share/luanti/textures/base/pack/` | **works** — they are gone |
+| `hud_scaling` 1.4 → 0.8 | no effect on button size or position |
+
+So they are blanked in place, with the originals kept beside them as `.orig`. **The touch zone
+remains** — 5.10 has no way to remove or move a button, only to stop drawing it — so slots 5-8 are
+selected with the keyboard, or now with the L/R shoulder buttons, which is the better answer anyway.
+
+Moving and resizing them needs the touchscreen layout editor added in **5.11**. Debian trixie carries
+only 5.10 with no backports; Flathub has an aarch64 build. **Decision: stay on the Debian package.**
+The engine is the one dependency this project does not want to be clever about.

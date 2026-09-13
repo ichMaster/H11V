@@ -182,6 +182,12 @@ trap 'rm -f "$CONF_TMP"' EXIT
 	cat "$ROOT/tools/device/minetest.conf"
 	echo
 	cat "$ROOT/tools/device/device-$PROFILE.conf"
+	echo
+	echo "# Blanks the on-screen jump/sneak buttons - see tools/device/texturepack/"
+	echo "texture_path = /home/$DEV_USER/$REMOTE_DIR/texturepack"
+	# Device-only: the gamepad buttons take W/A/S/D away, which the Mac needs.
+	echo
+	cat "$ROOT/tools/device/gamepad.conf"
 	# Measuring a profile against its own fps_max measures the fps_max. Appended
 	# last so it wins, and only when asked for: the cap is a real shipping choice
 	# and must not be lost by accident.
@@ -217,9 +223,30 @@ else
 fi
 "${SCP[@]}" "$CONF_TMP" "$TARGET:~/$REMOTE_DIR/minetest.conf.incoming" || die "config copy failed; the device still has its previous deploy"
 "${SCP[@]}" "$ROOT/tools/run_on_pi.sh" "$TARGET:~/$REMOTE_DIR/run_on_pi.sh.incoming" || die "run_on_pi.sh copy failed; nothing on the device was swapped"
+# The texture pack blanks two engine buttons the layout cannot move in 5.10.
+if command -v rsync >/dev/null 2>&1; then
+	rsync -a --delete -e "$RSYNC_RSH" "$ROOT/tools/device/texturepack/" "$TARGET:~/$REMOTE_DIR/texturepack/" || die "texture pack copy failed"
+else
+	"${SSH[@]}" "$TARGET" "rm -rf ~/$REMOTE_DIR/texturepack"
+	"${SCP[@]}" -r "$ROOT/tools/device/texturepack" "$TARGET:~/$REMOTE_DIR/texturepack"
+fi
 
 # Everything arrived. Stop the game and swap - mv within one filesystem is atomic.
-"${SSH[@]}" "$TARGET" "$PKILL"
+#
+# WAIT for it to be gone, do not just signal it. Luanti writes its settings back
+# to the config file as it shuts down, so a deploy that swaps the file while the
+# old process is still dying gets its new config overwritten by the old one's
+# memory — silently, and with the comments preserved so it looks like it worked.
+# That cost an afternoon: a whole keymap block arrived as comments with every
+# setting stripped out. Same lesson as --stop, which learned it first.
+"${SSH[@]}" "$TARGET" "
+	$PKILL
+	for _ in 1 2 3 4 5 6 7 8 9 10; do
+		pgrep -x luanti >/dev/null 2>&1 || pgrep -x minetest >/dev/null 2>&1 || break
+		sleep 0.5
+	done
+	pkill -9 -x luanti 2>/dev/null; pkill -9 -x minetest 2>/dev/null; true
+	sleep 0.5"
 "${SSH[@]}" "$TARGET" "
 	set -e
 	cd ~/$REMOTE_DIR

@@ -654,3 +654,77 @@ hex table is just someone's taste with authority it has not earned.
 Worth turning into a gate later: `tools/check_assets.py` already decodes PNGs with the stdlib, so
 measuring each delivered node texture's mean and failing on a too-tight pair is a small addition. Not
 built yet — the textures do not exist and the filenames change with them.
+
+## Design direction — the catalogue, and mutation as infection
+
+### 2026-09-13 — What H11 acts on: parts, not anonymous blocks
+
+Worked out with Vitalii across one conversation, before any of it is built. Recorded here because it
+settles several things the roadmap had left vague, and one thing `CLAUDE.md` had listed as open.
+
+**The build interface is a catalogue of parts, not freeform block placement.** A model cannot
+reliably emit fifty thousand coordinates — it loses count and drifts. So it emits a compact plan in a
+small vocabulary, and deterministic Lua expands it. Two levels, both needed: **primitives** (box,
+dome, wall, lamps) for terrain and filler, and **parts** — authored `.mts` schematics — for anything
+that has to look good.
+
+Parts carry **sockets**: `{at, dir, type}`. With them a plan contains no coordinates at all —
+`attach habitat_a to hub_core.socket[1]` — which removes the model's weakest skill (arithmetic) from
+the critical path and leaves it doing what it is good at, composition. Two engine features do more
+work here than they look: `place_schematic`'s `rotation` turns one schematic into four, and its
+`replacements` re-materialises the same shape in a different block set.
+
+**A registry of placed parts is the one new structure**, in mod storage:
+`{id, part, pos, rot, material, sockets_used, born_cycle, last_mutated_cycle}`. It costs almost
+nothing and it is what makes everything below possible — including `/undo`, without which an
+experimenting agent cannot be given any freedom.
+
+### 2026-09-13 — Mutation is an infection with a focus, and the frontier is maths
+
+Vitalii's framing, and it settles the mechanic: H11 is not a per-block dice roll, it is an
+**infection spreading from a focus**. The v1.2 rules table stays exactly as planned; what changes is
+what selects its targets.
+
+**The engine is already shaped for contact spread.** An ABM takes `neighbors` (and, from 5.10,
+`without_neighbors`), so "change only next to something already infected" is one field — the same
+mechanic as the engine's own canonical lava-cooling example.
+
+What the metaphor buys, none of which had a mechanic before:
+
+| | |
+|---|---|
+| **susceptibility per material** | crystal spreads fast, colony hull resists — so the player has a reason to choose what they build with |
+| **incubation** | the H11 glyph appears before the material changes: a warning, and something for the event card to report |
+| **quarantine** | the M4 anchor in `ref-03` suppresses mutation in a radius — now that is a barrier contact cannot cross, not just a look |
+| **a frontier the player can watch approach** | tension, and a reason to build away from it or against it |
+
+**The conflict, and the fix.** ABMs run only on loaded blocks, so contact spread alone would advance
+the infection *only where the player is standing* — run away and it freezes. That breaks the fiction
+and the determinism together.
+
+So the two levels are split:
+
+- **The frontier is a pure function.** `infected(pos, cycle) = dist(pos, focus) < r(cycle) + noise(pos)`.
+  Computable for any point at any time with no map loaded, independent of where the player has been.
+- **The detail is ABMs**, working *inside* a frontier that has already been decided. Contact spread
+  survives as local drawing, not as the thing that computes the boundary.
+
+**Determinism is the invariant to protect.** Lazy evaluation means the result must not depend on when
+the player walked past, so every rule is a pure function of `(state, cycle, seed)` —
+`hash(part_id, cycle, seed) < threshold`, never a per-tick dice roll. Otherwise two players with the
+same seed get different worlds and the cycle log describes something that never happened.
+
+**Mutate few things per cycle.** Forty changes read as noise; one reads as an event — which is why the
+reference art's `WORLD CHANGE` card shows a single change. With the part registry that card also stops
+being generic: *"HABITAT 02 → recursive lithic growth, built cycle 3, changed cycle 11"* rather than
+*"regolith → ..."*.
+
+**One trap, named early.** The player extends things by hand. Re-placing a schematic would erase that
+and read as a bug. So mutation edits nodes **in place**, touching only those that still match the
+original schematic — which is also what `CLAUDE.md` already requires: old blocks stay, changed ones
+carry the H11 stencil.
+
+**This closes an open question.** `CLAUDE.md` lists "catching up missed cycles after shutdown" as open
+at M4. It is now answered: lazily, at block load, via LBM (the engine tracks
+`lbm_introduction_times` in `env_meta.txt` for exactly this), computing the missed cycles from the
+frontier function rather than replaying them.

@@ -163,6 +163,37 @@ end
 core.register_on_newplayer(place)
 core.register_on_respawnplayer(place)
 
+--- Privileges.
+--
+-- A game that grants none leaves the player with the engine's bare defaults —
+-- interact and shout — and everything else silently refuses. That is not a
+-- theoretical gap: /time answered "missing privilege: settime" on the device,
+-- which is why the day-night cycle could not be checked at all, and the touch
+-- menu's own Fly / Fast / Noclip buttons are equally dead without them.
+--
+-- H11V is single-player on a personal handheld. There is nobody to protect the
+-- world from, so the player gets the lot. When v1 makes the world something the
+-- H11 algorithm owns rather than the player, this is the line to revisit.
+local PRIVS = {
+	interact = true, shout = true,
+	settime = true,          -- /time, needed to look at the world at night
+	fly = true, fast = true, noclip = true,
+	give = true, teleport = true, debug = true,
+	basic_debug = true, bring = true,
+}
+
+core.register_on_joinplayer(function(player)
+	-- Granted on join rather than set through default_privs so it holds on the
+	-- Mac and the device alike, and on a world created before this landed.
+	local name = player:get_player_name()
+	local have = core.get_player_privs(name)
+	local changed = false
+	for priv in pairs(PRIVS) do
+		if not have[priv] then have[priv] = true; changed = true end
+	end
+	if changed then core.set_player_privs(name, have) end
+end)
+
 --- The HUD: hotbar and crosshair, and nothing else.
 --
 -- v0 has no damage model, so an empty heart row is noise — and noise costs more

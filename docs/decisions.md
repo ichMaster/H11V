@@ -370,3 +370,27 @@ one is confirmed on the panel.
 **What confirms it:** the same judgement v0.7 has been waiting on — whether 16x16 reads better than
 32x32 at 3.5 inches. That question was the reason both sizes were ever in play, and it is answered by
 looking at the device, not by reasoning about it here.
+
+### 2026-09-13 — Touch: tap places, long press digs — and it is not discoverable
+
+The engine's own help, which is the authority here:
+
+```
+- slide finger: look around
+- tap:          place/punch/use
+- long tap:     dig/use
+```
+
+With `touch_use_crosshair = true` the **crosshair** picks the target, not the point of contact: a tap
+anywhere acts on whatever is being aimed at, and a tap while aiming at sky does nothing.
+
+**This is recorded as a finding, not just as documentation.** The control had to be asked for by the
+person who commissioned the game, on his own device — which is as clear a signal as this kind of
+thing gives. "Tap places, hold digs" also inverts the expectation most people arrive with. Nothing
+in v0 is going to fix it (v0 has no UI beyond a hotbar and a crosshair), but v4's player-facing work
+should not assume the scheme explains itself.
+
+`touch_interaction_style` was set in the device config and **does not exist in 5.10** — verified
+against the binary's own setting list. Removed rather than kept as forward-compatibility for 5.12: a
+setting that does nothing reads as a setting that does something, and the next person debugging touch
+would start with the one line that cannot possibly be the cause.

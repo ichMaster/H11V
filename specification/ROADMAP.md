@@ -149,6 +149,35 @@ it.
 
 **Tests:** the preflight; measurements on a software rasterizer are void and must be re-run.
 
+### v0.8 — The colony retheme
+
+**Goal:** stop the world looking like Minecraft.
+
+Not planned when v0 was written, and added here after the fact because it shipped. The v0 world was
+measured, playable and correct, and on the device it still read as Minecraft with a nicer palette —
+because grass, soil, bark, leaves and cobble *are* the Minecraft vocabulary, and no recolour escapes
+a vocabulary. So the vocabulary changed: a lander on an unsurveyed mineral planet, and the colony's
+own hardware to build with.
+
+**Tasks:** the art brief and its binding colour-separation rules
+([ART-COLONY.md](ART-COLONY.md)); the asset pack, reviewed and revised twice; the catalogue rename
+(`turf`→`regolith`, `dirt`→`fines`, `stone`→`lithic`, `sand`→`drift`, `trunk`→`spire`,
+`leaves`→`bloom`, `water`→`meltwater`) with v0 ids kept as aliases; four colony blocks — hull,
+prefab, crate, beacon; the scanner as the wield item; the gates and the probe retargeted.
+
+**DoD:** the pack passes every §4.1 separation rule; the device runs the rethemed world with zero
+engine errors and no unknown nodes; every acceptance gate green; the world is legible on the panel —
+terrain visible between the growths, terraces and water readable.
+
+**Tests:** `test_worldgen.sh` asserts `surface_top=h11_world:regolith` and `growths >= 20` — the
+latter replacing a `trees >= 20` that had been silently demanding sixteen times the DoD, since
+`trees` counts sampled columns rather than growths.
+
+**Note for later phases.** Two things here were invisible to every gate and found only by pulling a
+screenshot off the device: the growth density that was right for green canopies covered the world in
+magenta at the same value, and the gate above was measuring the wrong quantity. The gates prove the
+world contains what it should; they have no opinion about whether it can be looked at.
+
 ---
 
 ## v1 — The world: H11 mutates it

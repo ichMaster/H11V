@@ -157,6 +157,14 @@ CONTRACT_AREA=128          # the map the DoD's numbers describe
 MIN_ELEVATION_RANGE=8
 WANT_SURFACE="h11_world:turf"
 MIN_SURFACE_PCT=80
+MIN_WATER=1                # the DoD asks only that water is present
+# The tree count is the one figure that is not bit-stable: it varies by about one
+# column between runs on a fixed seed, because decoration placement draws from a
+# PRNG the map seed does not fully pin. At ~46 against a threshold of 20 that is a
+# 2% wobble with a 130% margin, so it is a fine assertion — but the margin is the
+# reason it is fine, and a future threshold raised close to the measured value
+# would make this gate flaky. Noted here rather than discovered later.
+MIN_TREES=20               # "at least 20 trees in a 128x128 area"
 
 fail=0
 assert_min() { # name value minimum
@@ -197,6 +205,20 @@ else
 fi
 assert_eq  "surface_top" "$(field surface_top)" "$WANT_SURFACE"
 assert_min "surface_top_pct" "$(field surface_top_pct)" "$MIN_SURFACE_PCT"
+
+# The v0.3 DoD. Both are properties of the 128x128 map rather than densities, so
+# like elevation_range they are asserted at the contract area only.
+#
+# `water` counts sampled columns whose GROUND is a water source, and `trees`
+# counts columns containing a trunk — neither is a raw block count, and the probe
+# says so where it computes them. Asserting a number whose definition lives
+# somewhere else is how a gate starts meaning something nobody intended.
+if [ "$AREA" = "$CONTRACT_AREA" ]; then
+	assert_min "water" "$(field water)" "$MIN_WATER"
+	assert_min "trees" "$(field trees)" "$MIN_TREES"
+else
+	echo "  --   water=$(field water) trees=$(field trees) (informational below area $CONTRACT_AREA)"
+fi
 
 # Engine errors are a failure even when the probe reports ok: a world that
 # generates despite an error is a world built on something we do not understand.

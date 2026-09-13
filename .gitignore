@@ -225,6 +225,10 @@ __marimo__/
 # runtime by tools/deploy_to_term35.sh. MUST never be committed.
 .term35-connect.txt
 
+# Connection details for the LAN box that hosts the v3 brain service.
+# Same shape, same rule.
+.brain-connect.txt
+
 # --- codegen instrumentation --------------------------------------------------
 # One directory per pipeline run: event logs, hook records, reconciliation.
 # Regenerable, often large, and can contain paths from the machine that ran it.

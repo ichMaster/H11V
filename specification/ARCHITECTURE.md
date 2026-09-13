@@ -55,7 +55,12 @@ axis is allowed to change alone.
 - **`h11_hud`** (from v1) — the cycle number, the H11 event card, the world-change card, and from v2
   the bot panels and the Observe/Follow interactions.
 - **`brain/`** (from v3) — a small Python HTTP service, one endpoint `POST /decide`, running on a
-  machine on the local network with a local model. Not on the device.
+  machine on the local network with a local model. Not on the device, and **not on the Mac**: the
+  Mac's firewall accepts an inbound LAN connection and tears the socket down before the first read,
+  so it cannot host a service the device talks to. The host is the LAN box `ich-picobox`; its
+  connection details live in the gitignored `.brain-connect.txt`, alongside the device's. It has no
+  discrete GPU (4 cores, 15 GB RAM, Intel integrated graphics), so the model must fit CPU inference
+  inside the 1-3 s budget — which is one more reason the body never waits on an answer.
 
 ## Three details the engine is strict about
 

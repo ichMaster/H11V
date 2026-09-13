@@ -223,6 +223,8 @@ fi
 
 # The GPU preflight from specification/ARCHITECTURE.md: an llvmpipe fallback
 # renders correctly and makes every fps number fiction, so it must be loud.
+# tools/gpu_preflight.sh is the authoritative probe; this is the post-launch
+# confirmation from the engine's own log, which is the renderer actually used.
 RENDERER="$("${SSH[@]}" "$TARGET" "grep -ihm1 -e 'renderer' ~/$REMOTE_DIR/h11v.log ~/.minetest/debug.txt ~/.luanti/debug.txt 2>/dev/null" || true)"
 if [ -n "$RENDERER" ]; then
 	echo "==> renderer: $RENDERER"

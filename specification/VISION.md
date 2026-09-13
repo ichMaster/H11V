@@ -87,7 +87,9 @@ repository — the tooling in `codegen/` and `.claude/skills/` is shared machine
 
 1. How long one mutation cycle lasts in real time — minutes (a game for one session) or hours and
    days (a world that lives in the background)?
-2. Which local model runs on the brain server, sized to answer in 1–3 seconds for three bots, and
-   whether that machine has a GPU.
+2. Which local model runs on the brain server. The host is settled and probed (13 Sep 2026): the LAN
+   box `ich-picobox`, Ubuntu 22.04, 4 cores, 15 GB RAM, Intel integrated graphics and **no discrete
+   GPU**. So inference is CPU-bound, and "answers in 1–3 seconds for three bots" points at a small
+   quantized model rather than anything comfortable — which model is the part still open.
 3. Whether the README and the player guide stay Ukrainian while the code and specifications are
    English.

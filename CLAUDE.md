@@ -103,9 +103,10 @@ Render at native 640x480, **always hardware-accelerated**: Mesa V3D via GL ES (`
   whenever art changed; `tools/run_local.sh` whenever anything visible changed; and a device run
   whenever a frame-rate budget is claimed. Never commit on a red gate.
 - **Commit messages in English**; README and the player guide in **Ukrainian**.
-- **Credentials never enter the repository.** The device's ip, user and password live in
-  `.term35-connect.txt` (gitignored); `tools/deploy_to_term35.sh` reads it at run time and never
-  echoes it. The `codegen/` hook is forbidden from recording raw command strings for the same reason.
+- **Credentials never enter the repository.** The device's details live in `.term35-connect.txt` and
+  the v3 brain host's in `.brain-connect.txt` — both gitignored, read at run time, never echoed. The
+  brain runs on the LAN box `ich-picobox`, never on the Mac: the Mac's firewall kills inbound LAN
+  connections before the first read. The `codegen/` hook is forbidden from recording raw command strings for the same reason.
 - Do not add mechanics from the out-of-scope list (concept §8): infinite world, crafting recipes, hostile mobs, combat, multiplayer, custom renderer.
 - The project stands alone: do not pull code, prompts, or assets in from other repositories.
 - Media assets must be self-made or CC0. Luanti is LGPL; the game mods carry their own license.

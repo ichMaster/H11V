@@ -142,4 +142,5 @@ python3 -m venv .venv && .venv/bin/pip install -r codegen/requirements.txt
 - **The device is the truth.** A budget claim measured on the Mac is not a measurement, and one
   measured on llvmpipe is not a measurement either.
 - **Credentials never enter the repository.** The device's ip, user and password live in
-  `.term35-connect.txt`, which is gitignored; scripts read it at run time and never echo it.
+  `.term35-connect.txt` and the brain host's in `.brain-connect.txt`; both are gitignored, read at
+  run time, and never echoed.

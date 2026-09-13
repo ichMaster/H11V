@@ -2,11 +2,18 @@
 # Resolve how to invoke Luanti on this machine. Source it; do not execute it.
 #
 #   . tools/luanti_path.sh
-#   "$LUANTI" --version                 # the client
-#   $LUANTI_SERVER --gameid h11v ...    # the headless server (unquoted: may be two words)
+#   "$LUANTI" --version                  # the client
+#   luanti_server --gameid h11v ...      # the headless server
 #
-# Sets LUANTI, LUANTI_SERVER and LUANTI_VERSION; returns non-zero if the engine
-# is not installed, so a caller can fail with its own message.
+# Sets LUANTI and LUANTI_VERSION, and defines luanti_server() — call that rather
+# than expanding a variable: on the Mac the server is "<binary> --server", two
+# words, and zsh does not word-split an unquoted parameter the way bash does, so
+# `$LUANTI_SERVER ...` silently becomes one very odd filename. A function is the
+# one form that behaves the same in both shells. LUANTI_SERVER is still exported,
+# for printing in diagnostics only.
+#
+# Returns non-zero if the engine is not installed, so a caller can fail with its
+# own message.
 #
 # Why this file exists: the two target platforms package the server differently,
 # and hardcoding either name gives a red gate that reads like a bug in the game.
@@ -39,8 +46,15 @@ for candidate in \
 	"$(command -v minetestserver 2>/dev/null)"; do
 	if [ -n "$candidate" ] && [ -x "$candidate" ]; then LUANTI_SERVER="$candidate"; break; fi
 done
-if [ -z "$LUANTI_SERVER" ] && [ -n "$LUANTI" ]; then
+if [ -n "$LUANTI_SERVER" ]; then
+	# A real dedicated-server binary: run it directly.
+	luanti_server() { command "$LUANTI_SERVER" "$@"; }
+elif [ -n "$LUANTI" ]; then
+	# No separate binary (the macOS bundle): dedicated-server mode on the client.
 	LUANTI_SERVER="$LUANTI --server"
+	luanti_server() { command "$LUANTI" --server "$@"; }
+else
+	luanti_server() { echo "luanti_server: Luanti is not installed" >&2; return 127; }
 fi
 
 LUANTI_VERSION=""

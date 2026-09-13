@@ -63,7 +63,9 @@ layers. First version of `test_worldgen.sh`.
 surface biome; `test_worldgen.sh` asserting elevation range.
 
 **DoD:** a generated world has turf on top and dirt under it — not bare stone — with a surface
-elevation range of at least 8 blocks.
+elevation range of at least 8 blocks, **and the engine log is clean**: registering the aliases closes
+the three `Mapgen alias ... is invalid!` errors that v0.1's empty mod necessarily leaves behind (the
+engine demands them before any node exists to satisfy them).
 
 **Tests:** `test_worldgen.sh` asserts elevation range ≥ 8 and that the top node is `h11_world:turf`.
 

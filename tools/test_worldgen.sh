@@ -145,9 +145,13 @@ STATUS="$(field status)"
 [ "$STATUS" = "ok" ] || { echo "test_worldgen: FAIL — probe status=$STATUS" >&2; exit 1; }
 
 # --- assertions ---------------------------------------------------------------
-# Each prints what it measured. H11V-008 adds the terrain assertions; H11V-0xx in
-# v0.3 adds water and trees. Until then the harness proves only that a world
-# generated at all, which is what this issue claims.
+# Each prints what it measured, pass or fail. v0.3 adds water and trees; the
+# thresholds live here rather than in the probe so that changing what the project
+# demands never means changing what it measures.
+
+MIN_ELEVATION_RANGE=8
+WANT_SURFACE="h11_world:turf"
+MIN_SURFACE_PCT=80
 
 fail=0
 assert_min() { # name value minimum
@@ -157,8 +161,21 @@ assert_min() { # name value minimum
 		echo "  ok   $1=$2 (>= $3)"
 	fi
 }
+assert_eq() { # name value expected
+	if [ "$2" != "$3" ]; then
+		echo "  FAIL $1=$2 (need $3)" >&2; fail=1
+	else
+		echo "  ok   $1=$2"
+	fi
+}
 
 assert_min "sampled" "$(field sampled)" 1
+
+# The v0.2 DoD, made machine-checkable: a horizon with elevation rather than a
+# slab, and our turf on top rather than the bare stone a missing biome gives.
+assert_min "elevation_range" "$(field elevation_range)" "$MIN_ELEVATION_RANGE"
+assert_eq  "surface_top" "$(field surface_top)" "$WANT_SURFACE"
+assert_min "surface_top_pct" "$(field surface_top_pct)" "$MIN_SURFACE_PCT"
 
 # Engine errors are a failure even when the probe reports ok: a world that
 # generates despite an error is a world built on something we do not understand.

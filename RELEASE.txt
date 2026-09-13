@@ -4,6 +4,26 @@ H11V release log
 Newest first. A release is cut per roadmap phase (vA.B -> A.B.0); a post-release
 fix on that phase bumps the third number. See specification/SDLC.md.
 
+0.7.2 — 2026-09-13 — turning on the shoulder buttons
+---------------------------------------------------
+
+  * L and R turn the view. Luanti has no key binding for the camera at all, so
+    this is done in a mod; the buttons ride on the `zoom` and `aux1` controls
+    because those are the two a mod can observe and nothing else was using them.
+  * Both transports had effects of their own and both are neutralised: R no
+    longer sprints (the `fast` privilege is actively revoked, since privileges
+    live in the world's auth database and survive being dropped from a list), and
+    L no longer zooms (the mod pins the field of view while the button is held —
+    zoom_fov = fov did not work).
+  * dedicated_server_step 0.09 -> 0.02. Both the turn and the zoom correction run
+    on that clock: at the default the view moved 11 times a second, which reads as
+    stepping, and the zoom flash lasted a full 90 ms. Now 50 Hz for both.
+
+  A brief flash on pressing L remains and is accepted. The client predicts the
+  zoom instantly and the server undoes it on its next step; zoom is not a
+  registered privilege in 5.10, so there is nothing to revoke, and no client-side
+  API exists to suppress the prediction.
+
 0.7.1 — 2026-09-13 — device fixes on v0.7
 -----------------------------------------
 

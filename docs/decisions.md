@@ -510,3 +510,37 @@ selected with the keyboard, or now with the L/R shoulder buttons, which is the b
 Moving and resizing them needs the touchscreen layout editor added in **5.11**. Debian trixie carries
 only 5.10 with no backports; Flathub has an aarch64 build. **Decision: stay on the Debian package.**
 The engine is the one dependency this project does not want to be clever about.
+
+### 2026-09-13 — Turning on L/R, and why it costs a flash
+
+**Luanti has no key binding for the camera.** `keymap_*` covers movement, strafing, digging and
+menus; looking belongs to the mouse and the touchscreen. On a device with neither a mouse nor a
+comfortable way to drag-and-tap at once, that makes turning the single most awkward thing in the
+game. So it is done in `turn.lua`, reading controls and calling `set_look_horizontal`.
+
+**The buttons have to arrive as something a mod can see.** `get_player_control()` reports a fixed
+set — movement, jump, sneak, dig, place, aux1, zoom — so L and R are bound to `zoom` and `aux1`
+purely because those two were unclaimed. The binding is a transport, not a meaning.
+
+**A transport must be inert, and neither of these was:**
+
+| | effect | how it was neutralised |
+|---|---|---|
+| R → `aux1` | sprinted while turning | the `fast` privilege is **revoked**, not merely ungranted — privileges live in the world's auth database, so one granted by an earlier version of this file survives forever unless something removes it |
+| L → `zoom` | zooms the camera | `zoom_fov = fov` did **not** work; `turn.lua` pins the FOV with `set_fov` while the button is held |
+
+**The flash that remains is structural.** The client predicts the zoom the instant the key goes down;
+the server undoes it on its next step. **The step length is the flash length** — 90 ms at Luanti's
+default `dedicated_server_step`, which is exactly what "a flash of milliseconds" was. It is now
+`0.02`, so both the correction and the turn itself run at 50 Hz rather than 11: the flash is much
+shorter and the turn stopped stepping. The device has the headroom — 2-3 ms of drawtime against 33,
+four cores, no entities and no ABMs.
+
+It cannot be removed. `zoom` is **not a registered privilege** in 5.10 (checked against the engine's
+own `privileges.lua`: interact, shout, basic_privs, privs, teleport, bring, settime, server,
+protection_bypass, ban, kick, give, password, fly, fast, noclip, rollback, debug — no zoom), so there
+is nothing to revoke, and Luanti has no client-side API that would let a mod suppress the prediction.
+**Accepted as-is on Vitalii's call.**
+
+The escape hatch, if it ever stops being acceptable: drop turning from L and keep it only on R, whose
+`aux1` transport is genuinely inert and flashes not at all.

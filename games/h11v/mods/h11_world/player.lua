@@ -177,19 +177,34 @@ core.register_on_respawnplayer(place)
 local PRIVS = {
 	interact = true, shout = true,
 	settime = true,          -- /time, needed to look at the world at night
-	fly = true, fast = true, noclip = true,
+	fly = true, noclip = true,
+	-- `fast` is deliberately NOT granted. The R shoulder button is carried on
+	-- aux1 (tools/device/gamepad.conf), and aux1 with the fast privilege makes
+	-- the player sprint while turning. A transport key has to be inert.
 	give = true, teleport = true, debug = true,
 	basic_debug = true, bring = true,
 }
 
+-- Privileges that must NOT be held, and are actively taken away.
+--
+-- Granting alone is not enough: privileges live in the world's auth database, so
+-- one that was granted by an earlier version of this file stays granted forever
+-- unless something removes it. `fast` was, and the R shoulder button — carried on
+-- aux1 — made the player sprint while turning until it was revoked here rather
+-- than merely dropped from the list above.
+local DENY = { fast = true }
+
 core.register_on_joinplayer(function(player)
-	-- Granted on join rather than set through default_privs so it holds on the
-	-- Mac and the device alike, and on a world created before this landed.
+	-- Applied on join rather than through default_privs so it holds on the Mac
+	-- and the device alike, and on a world created before this landed.
 	local name = player:get_player_name()
 	local have = core.get_player_privs(name)
 	local changed = false
 	for priv in pairs(PRIVS) do
 		if not have[priv] then have[priv] = true; changed = true end
+	end
+	for priv in pairs(DENY) do
+		if have[priv] then have[priv] = nil; changed = true end
 	end
 	if changed then core.set_player_privs(name, have) end
 end)

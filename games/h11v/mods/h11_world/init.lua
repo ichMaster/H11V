@@ -20,5 +20,6 @@ dofile(modpath .. "/nodes.lua")
 dofile(modpath .. "/mapgen.lua")
 dofile(modpath .. "/player.lua")
 dofile(modpath .. "/music.lua")
+dofile(modpath .. "/turn.lua")
 
 core.log("action", "[h11_world] loaded from " .. modpath)

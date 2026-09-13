@@ -117,6 +117,50 @@ local NODES = {
 			post_effect_color = { a = 90, r = 79, g = 179, b = 201 },
 		},
 	},
+	{
+		-- The other half of the liquid. Without it the first shoreline the player
+		-- digs spawns unknown-node checkerboards: the engine wants somewhere to
+		-- put the water that is no longer a source, and an unresolved
+		-- liquid_alternative_flowing is not somewhere.
+		--
+		-- "flowingliquid" is a real drawtype, unlike the "liquidsource" this file
+		-- briefly had for the source. Both names are pinned in ARCHITECTURE.md.
+		id = "water_flowing",
+		description = S("Flowing Water"),
+		drawtype = "flowingliquid",
+		-- A flowing liquid draws from special_tiles, not tiles: the engine needs
+		-- the animated strip for the sloped faces it builds per flow direction.
+		tiles = { "h11_water.png" },
+		groups = { water = 3, liquid = 3, not_in_creative_inventory = 1 },
+		extra = {
+			paramtype = "light",
+			paramtype2 = "flowingliquid",
+			walkable = false,
+			pointable = false,
+			diggable = false,
+			buildable_to = true,
+			is_ground_content = false,
+			drowning = 1,
+			liquidtype = "flowing",
+			liquid_alternative_flowing = "h11_world:water_flowing",
+			liquid_alternative_source = "h11_world:water_source",
+			liquid_viscosity = 1,
+			liquid_range = 7,
+			post_effect_color = { a = 90, r = 79, g = 179, b = 201 },
+			special_tiles = {
+				{
+					name = "h11_water_flowing.png",
+					backface_culling = false,
+					animation = { type = "vertical_frames", aspect_w = 32, aspect_h = 32, length = 0.8 },
+				},
+				{
+					name = "h11_water_flowing.png",
+					backface_culling = true,
+					animation = { type = "vertical_frames", aspect_w = 32, aspect_h = 32, length = 0.8 },
+				},
+			},
+		},
+	},
 }
 
 --- Required keys on every row. Asserted rather than assumed: a row added in a

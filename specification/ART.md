@@ -7,6 +7,17 @@ code — plus the audit of what came back.
 
 Part one governs. Part two is how it was realised for v0 and the template for every later order.
 
+> **Superseded for the next pack — 13 September 2026.** The world direction below is retired in
+> favour of [ART-COLONY.md](ART-COLONY.md): a planetary-colonisation world of bone regolith, crystal
+> growth and colony hardware, referenced by the two images in [art/space/](art/space/). The reason is
+> recorded in [docs/decisions.md](../docs/decisions.md) — grass, soil, bark and leaves are Minecraft's
+> own vocabulary, and recolouring them cannot escape it.
+>
+> This document remains authoritative for two things: **the UI voice** (dark glass panels, thin light
+> borders, cyan monospace type, the event and world-change cards, the bot panel) and **the v0 pack
+> that currently ships**, audited in §9. The bots' design language in `ref-02` also stands until the
+> M2 bot brief replaces it.
+
 ---
 
 # Part one — art direction

@@ -584,3 +584,42 @@ old `bindsym Print` was still live and still counting up screenshots. `swaymsg r
 appears in `debug.txt`, and the natural conclusion — the wrong key name — was wrong twice over. When a
 key does nothing on this device, ask the compositor what it has claimed before touching the game's
 keymap. The current claims: `$mod`-prefixed bindings, and `$mod+Print`.
+
+## Art direction
+
+### 2026-09-13 — The world stops being a meadow: colonising another planet
+
+Vitalii's judgement after playing the device build: *"зараз мод дуже схожий на стандартний мод
+майнкрафту навіть з нашими кастомізаціями"* — and he is right. The v0 pack is well drawn, tiles
+cleanly and reads at 3.5 inches; none of that was the problem.
+
+**The problem is the vocabulary, not the palette.** Grass, soil, bark, leaves, sand, cobble and water
+are not generic voxel materials — they are Minecraft's own material set, and a player recognises the
+game by them before noticing a single hex value. Every fix available inside that set is a recolour,
+and a recolour of Minecraft is Minecraft. So the set itself changes.
+
+The new direction is a **planetary colony**, fixed by two reference images in
+`specification/art/space/` and written up as [ART-COLONY.md](../specification/ART-COLONY.md):
+
+| v0 | now |
+|---|---|
+| turf / dirt / stone / sand | regolith / fines / lithic / drift — bone-pale mineral, violet-grey, no green |
+| trunk / leaves | spire / bloom — a faceted crystal stalk and a hanging filament crown |
+| water | meltwater — luminous cyan, lit from within |
+| — | **hull, prefab, crate, beacon** — the colony's own hardware, what the player builds with |
+
+**The colony blocks are the load-bearing half of the change.** The planet set alone would still be a
+terrain recolour; four machined, human-made blocks in the hotbar are what makes the world read as a
+landing site rather than a biome. The brief states it as one rule: every block belongs to either the
+**grown** language (facets, needles, filaments, internal light) or the **built** one (plates, seams,
+rivets, stencils), and the two must be distinguishable at 8 pixels.
+
+**Two things deliberately survive the change**, because they were never the problem: the **UI voice**
+(dark glass, thin light borders, cyan monospace, the event and world-change cards) and the **H11 glyph
+language**. `ART.md` stays authoritative for both, and for the v0 pack that currently ships.
+
+**The cost is a rename, and it is not free.** Node ids move with the fiction
+(`h11_world:turf` → `regolith`, and so on), which touches `nodes.lua`, `mapgen.lua`, `player.lua` and
+the pinned filename tables in `tools/check_assets.py`. Worlds generated before it will not survive —
+accepted: v0's world is a test fixture, not a save. §10 of the brief carries the list so the delivery
+does not arrive looking cheaper than it is.

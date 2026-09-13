@@ -74,27 +74,128 @@ Floating islands, megastructures, the gas giant, the bots and the buildings in t
 mood and future work, not deliverables in this order. They define the language the ordered assets
 must belong to.
 
-## 4. Palette
+## 4. Palette — yours to choose
 
-Sampled from the two canon references. Keep the families; tune freely inside them.
+The table below is a **starting sketch** sampled from the two canon references. It is deliberately
+*not* a contract: choose your own values, and let the references be the authority on mood.
 
-| Role | Hex | Notes |
+| Role | Sketch | Notes |
 | --- | --- | --- |
-| Regolith bone | `#E8E2D4` | the ground truth of the world; shadow `#C4BCA9` |
-| Biofilm cyan | `#7FD9D0` | the thin living film on the regolith cap — sparse, never a lawn |
-| Fines violet-grey | `#A79CB0` | subsoil; shadow `#7E738C` |
-| Lithic ivory | `#F1EDE4` | bedrock plates, brighter than regolith; shadow `#CBC3B4` |
-| Drift pale | `#EFE6CF` | wind dust, warm-neutral |
-| Crystal lilac | `#B98FE0` | spire body; deep `#7C4FB0` |
-| Bloom violet | `#C05BD0` | hanging filaments; rose accent `#E86FA8` |
-| Meltwater cyan | `#57D8E8` | luminous; depth `#2E8FB0` |
+| Regolith | `#E8E2D4` | the ground truth of the world |
+| Biofilm | `#7FD9D0` | the thin living film on the regolith cap — sparse, never a lawn |
+| Fines | `#A79CB0` | subsoil |
+| Lithic | `#F1EDE4` | bedrock plates |
+| Drift | `#EFE6CF` | wind dust |
+| Crystal | `#B98FE0` | spire body |
+| Bloom | `#C05BD0` | hanging filaments; rose accent `#E86FA8` |
+| Meltwater | `#57D8E8` | luminous; depth `#2E8FB0` |
 | H11 glow | `#64E0EC` | the crust's light, and the HUD's primary accent |
-| Hull white | `#F3F2EE` | lander plating; panel grey `#9AA2A8`, dark grey `#3A4248` |
-| Safety orange | `#E2622A` | stencils, stripes, hazard marks — used sparingly, always as *marking* |
+| Hull | `#F3F2EE` | lander plating; panel grey `#9AA2A8`, dark grey `#3A4248` |
+| Safety orange | `#E2622A` | stencils and hazard marks — always used as *marking*, never as a field |
 | Crate amber | `#E8A33C` | cargo, banding `#2F2A24` |
 | Panel glass | `#14202B` @ ~80% | HUD panels, thin `#A8D8E0` borders |
 
-The world's warm notes come only from the colony. The planet itself has no warm hue above `#E8E2D4`.
+Two things about this sketch are load-bearing and should survive whatever you choose: the world's
+**warm notes come only from the colony** — the planet itself is cool — and **safety orange is a mark,
+never a surface**.
+
+## 4.1 Separation — this part is binding
+
+The sketch above is also a worked example of how this world goes wrong, and the reason is worth
+stating before the rules.
+
+**At 5–20 pixels a texture collapses to its mean colour.** View range is 40–100 nodes on a 640x480
+panel, so most of what is on screen at any moment is a block a handful of pixels tall. Detail,
+clusters, glyphs, rivets — none of it survives that. Two materials are told apart by their *means*
+and by nothing else. And this fiction pushes hard in the wrong direction: regolith, lithic, drift and
+hull are all, in plain language, "pale mineral white".
+
+Measured on the sketch, four of the six opaque materials sat within ΔL\* 4 of each other — regolith
+and drift differed by **1.4** at an identical hue, lithic and the ship's hull by **1.6**. That palette
+would have rendered as one grey planet with a grey shipwreck on it. The reference images get away with
+it because ray-traced shadows and ambient occlusion do the separating; the device has **no shadows at
+all** — they are off in every profile, and that is a frame-rate decision, not an oversight.
+
+So the colours are yours, and these six rules are not.
+
+**Rule 1 — the value ladder.** The opaque materials share one ladder, and **neighbours sit at least 8
+L\* apart**. This order is chosen so the ground you walk on sits in the middle and the cliffs and
+dunes read brighter against it:
+
+```
+brightest   drift          wind dust catches the light
+            lithic         bedrock, cliff faces
+            regolith       the walkable surface
+            hull           worn plating, entry-scorched
+            prefab         habitat panels
+darkest     fines          subsoil
+```
+
+Eight points is not arbitrary: it is roughly the smallest lightness step that still separates two
+flat 8-pixel patches under the engine's own light modulation.
+
+**Rule 2 — hue does the work when value cannot.** Any two materials closer than 8 L\* must be **at
+least 60° apart in hue**. Spread the ladder around the wheel rather than stacking one family: a warm
+dust, a cool bedrock, a cyan-cast regolith, a violet subsoil. Hue is also what survives nightfall,
+when the engine compresses every value toward black and the ladder flattens.
+
+**Rule 3 — four collisions are structural in this fiction.** They are not mistakes waiting to happen;
+they are where this world naturally wants to fold. Solve each deliberately:
+
+| pair | why they collide | the lever |
+| --- | --- | --- |
+| lithic ↔ meltwater | both pale and cool | water carries much higher chroma, and is the only partial-alpha surface — lean on saturation |
+| regolith ↔ meltwater | the shore, where they are literally adjacent | keep the biofilm's cyan *desaturated*; the water owns saturated cyan |
+| hull ↔ crate | both warm mid-tone colony hardware | the crate is saturated amber, the hull is nearly neutral — separate by chroma, not lightness |
+| fines ↔ bloom | both violet | bloom is far more saturated and has binary-alpha gaps; fines is flat and muted |
+
+**Rule 4 — spatial frequency is the third axis.** Between about 10 and 20 pixels, before detail fully
+dissolves, cluster size still reads. Give each material its own:
+
+| material | frequency |
+| --- | --- |
+| lithic | large flat plates, few long fracture lines — reads smooth |
+| drift | fine even ripple — reads soft and uniform |
+| regolith | a plain field with sparse discrete specks — reads speckled |
+| fines | medium mottled clusters — reads grainy |
+| hull | a regular seam-and-rivet lattice — reads manufactured |
+| prefab | one strong vertical seam, otherwise flat — reads panelled |
+
+**Rule 5 — top faces are brighter than side faces**, in every material that has both. Terrain reads in
+silhouette only if the horizontal planes separate from the vertical ones. The engine's own face shading
+helps, but it is not enough on its own and it must not be relied on.
+
+**Rule 6 — check at 30% brightness.** At night the world is lit by the H11 crust and the colony's
+beacons, and everything else is multiplied toward black. The value ladder compresses; the hue spread
+from Rule 2 is what still separates regolith from lithic when it does.
+
+### How to verify, before delivering
+
+Two checks, both cheap, both worth more than any amount of looking at the tiles at full size:
+
+1. **Downscale each node texture to a single pixel** and lay the results side by side. That one pixel
+   is, near enough, what the engine puts on screen at distance. Any two that look alike there *are*
+   alike. Check every pair, not only the ones you expect to be close.
+2. **Render the set at 8x8 and squint.** If the terrain set turns into a single field of porridge, the
+   ladder is too tight — no amount of detail at 32x32 will rescue it.
+
+### One palette that passes, as proof the rules are satisfiable
+
+Not a proposal — a demonstration that an 8-point ladder with a spread of hues actually exists inside
+this fiction. Take it, ignore it, or use it as a floor to beat:
+
+| material | L\* | C\* | hue | hex |
+| --- | --- | --- | --- | --- |
+| drift | 92 | 16 | 85° | `#F7E6CA` |
+| lithic | 84 | 6 | 250° | `#C8D3DC` |
+| regolith | 76 | 13 | 175° | `#A2C2B9` |
+| hull | 68 | 9 | 45° | `#B6A19B` |
+| prefab | 60 | 5 | 250° | `#899299` |
+| fines | 52 | 16 | 300° | `#7E7894` |
+
+It is cooler and less creamy than the references, which is the honest cost of losing ray-traced
+shadows. If you can hold the reference's warm bone light *and* the ladder, that is a better answer than
+this one — the rules are the requirement, the hexes never were.
 
 ---
 

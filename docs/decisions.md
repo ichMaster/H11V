@@ -623,3 +623,34 @@ language**. `ART.md` stays authoritative for both, and for the v0 pack that curr
 the pinned filename tables in `tools/check_assets.py`. Worlds generated before it will not survive —
 accepted: v0's world is a test fixture, not a save. §10 of the brief carries the list so the delivery
 does not arrive looking cheaper than it is.
+
+### 2026-09-13 — The bone planet nearly read as porridge, and the fix is a rule, not a palette
+
+Writing the colony brief produced a palette worth measuring before anyone drew from it. Measured in
+CIE L\*a\*b\*, **four of its six opaque materials sat within ΔL\* 4 of each other**: regolith and drift
+differed by 1.4 at an *identical* hue, lithic and the ship's hull by 1.6. On a 3.5-inch panel that is
+one grey planet with a grey shipwreck on it.
+
+**Why this world is prone to it.** The fiction asks for bone regolith, bone bedrock, pale drift and a
+white hull — four ways of saying "pale mineral". The reference images carry it because ray-traced
+shadows and ambient occlusion separate the forms. **The device has no shadows in any profile**, and
+that is a frame-rate decision, so the separation has to live in the textures themselves.
+
+**And the scale is brutal.** At view range 40–100 most blocks on screen are 5–20 px tall, where a
+texture collapses to roughly its mean colour. Clusters, rivets and glyphs are all gone. Two materials
+are told apart by their means and by nothing else.
+
+So [ART-COLONY.md](../specification/ART-COLONY.md) §4.1 states six binding rules — an 8-point L\*
+ladder, a 60° hue spread for anything closer than that, four named structural collisions
+(lithic↔meltwater, regolith↔meltwater, hull↔crate, fines↔bloom), spatial frequency as a third axis,
+top-vs-side, and a check at 30% brightness — plus a verification method: downscale each tile to one
+pixel and compare every pair.
+
+**The hex values are deliberately not binding.** Vitalii's call: give Claude Design the constraints and
+let it choose the colour. A worked palette that passes the rules is included only as proof they are
+satisfiable, and it is explicitly a floor to beat rather than a proposal. The rules are checkable; a
+hex table is just someone's taste with authority it has not earned.
+
+Worth turning into a gate later: `tools/check_assets.py` already decodes PNGs with the stdlib, so
+measuring each delivered node texture's mean and failing on a too-tight pair is a small addition. Not
+built yet — the textures do not exist and the filenames change with them.

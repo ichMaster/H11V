@@ -4,6 +4,32 @@ H11V release log
 Newest first. A release is cut per roadmap phase (vA.B -> A.B.0); a post-release
 fix on that phase bumps the third number. See specification/SDLC.md.
 
+0.2.0 — 2026-09-13 — v0.2 Blocks and terrain
+--------------------------------------------
+
+The world stops being empty: our own blocks, our own terrain, and the headless
+gate every later phase is held to.
+
+  * nodes.lua — eight blocks as eight rows and one loop, because v1's mutation
+    rules are rows addressing these same node ids. Required keys asserted at load.
+    Turf's tiles are a three-element list: Luanti's shorthand fill-in would
+    otherwise draw the green fringe on the block's underside.
+  * mapgen.lua — the three aliases v7 actually reads, and one technical biome.
+    The v6 aliases' absence is the load-bearing part: register them under v7 and
+    the world is bare stone, with no error to explain it.
+  * tools/test_worldgen.sh — a dedicated server, a force-emerged area, a
+    VoxelManip scan, one parseable line, guaranteed shutdown. Kernel-assigned
+    port and cleanup on every exit path, after v0.1 lost an afternoon to a
+    leftover server holding 30000.
+  * The gate proves the DoD: elevation_range=19 against a required 8, turf on 99%
+    of 1024 sampled columns, no engine errors. Verified red by breaking the biome
+    on purpose — a gate never seen to fail is not known to work.
+
+  Fixed before the tag: water_source was registered with drawtype
+  "liquidsource", which is not a Luanti drawtype. The engine falls back to a
+  normal cube, so water would have looked like solid teal stone while behaving
+  like water. ARCHITECTURE.md already said "liquid".
+
 
 0.1.0 — 2026-09-13 — v0.1 Toolchain and skeleton
 ------------------------------------------------

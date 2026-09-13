@@ -5,6 +5,10 @@
 #   tools/test_worldgen.sh --keep       keep the temporary world for inspection
 #   tools/test_worldgen.sh --area=64    scan a smaller area (default 128)
 #
+# --area is for quick iteration. The DoD's elevation threshold describes the
+# 128x128 map, so below that area it is reported but not asserted; composition
+# assertions apply at every size.
+#
 # Starts a dedicated server with games/h11v, force-emerges the area, scans it with
 # a VoxelManip, prints one result line and shuts down. Exits 0 when every
 # assertion holds, 1 otherwise — and prints the measured values either way,
@@ -149,6 +153,7 @@ STATUS="$(field status)"
 # thresholds live here rather than in the probe so that changing what the project
 # demands never means changing what it measures.
 
+CONTRACT_AREA=128          # the map the DoD's numbers describe
 MIN_ELEVATION_RANGE=8
 WANT_SURFACE="h11_world:turf"
 MIN_SURFACE_PCT=80
@@ -179,7 +184,17 @@ assert_min "sampled" "$(field sampled)" 1
 
 # The v0.2 DoD, made machine-checkable: a horizon with elevation rather than a
 # slab, and our turf on top rather than the bare stone a missing biome gives.
-assert_min "elevation_range" "$(field elevation_range)" "$MIN_ELEVATION_RANGE"
+#
+# elevation_range is asserted only at the contract area. The DoD's "at least 8
+# blocks" is a property of the 128x128 map, not a density — a 48x48 sample of the
+# same terrain honestly measures less, and asserting the full map's number
+# against a fraction of it would turn --area into a source of red gates that mean
+# nothing. Composition assertions have no such problem and always apply.
+if [ "$AREA" = "$CONTRACT_AREA" ]; then
+	assert_min "elevation_range" "$(field elevation_range)" "$MIN_ELEVATION_RANGE"
+else
+	echo "  --   elevation_range=$(field elevation_range) (informational: the DoD's >= $MIN_ELEVATION_RANGE applies at area $CONTRACT_AREA)"
+fi
 assert_eq  "surface_top" "$(field surface_top)" "$WANT_SURFACE"
 assert_min "surface_top_pct" "$(field surface_top_pct)" "$MIN_SURFACE_PCT"
 

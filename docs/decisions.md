@@ -294,7 +294,49 @@ Still owed by a person at the device, and the reason v0.7 is not yet closed:
 - whether the H11 glyph reads on the crust block at normal viewing distance
 - whether touch digging and placing actually feel right, which no capture can show
 
-### 2026-09-13 — Node textures ship at 16x16, superseding the 32x32 decision — **on trial**
+### 2026-09-13 — 32x32 stands. The 16x16 trial was run on the device and reverted
+
+Node textures ship at the authored **32x32**. The entry below proposed 16x16, it was built,
+installed, looked at on the panel and rolled back the same day on Vitalii's call. `check_assets.py`
+detects the installed resolution, so nothing else moved in either direction.
+
+**Why it is worth keeping the trial on record rather than deleting it:** it cost one command each
+way precisely because the delivery of record was never modified, and it retired two plausible
+arguments permanently — the "2-pixel clusters" claim (measured: 44%) and the "less shimmer" claim
+(measured: no difference). Both are the kind of thing that gets re-proposed from intuition every few
+months.
+
+This also answers the first of v0.7's open questions: **32x32 reads correctly at 3.5 inches**,
+confirmed by looking at both.
+
+### 2026-09-13 — The engine's dialogs needed two different fixes, not one
+
+Reported from the device: in Change Keys every label ran together. That turned up a second, worse
+instance — the pause menu's controls-help column ran off the right edge with no way to reach it.
+
+They look alike and are not the same bug:
+
+- **`font_size` 20 → 14** fixes text overflowing its own cell, which is what makes labels merge.
+- **`gui_scaling` 1.4 → 1.0** fixes a dialog *wider than the screen*. The engine's menus are laid out
+  for a desktop; scaling them up on a 640x480 panel pushes their right-hand columns past the edge,
+  and no font size touches that.
+
+`hud_scaling` stays at 1.4. The HUD and the GUI scale separately and want opposite things here: the
+hotbar is a touch target and must stay finger-sized, while the dialogs have to fit the panel.
+
+Confirmed readable on the device after both changes.
+
+### 2026-09-13 — Tree density is a setting, because the forest hid the world
+
+`h11v_tree_density`, default `0.032`, overridden by `tools/deploy_to_term35.sh --trees=N` (which
+implies `--fresh`, since decorations are placed at generation).
+
+**Why:** judging the shape of the world — how far it runs, how tall the hills are, whether 128x128
+feels like a place — is impossible from inside a forest. The alternative was editing the shipped
+value and remembering to revert it, which is the kind of thing that does not get remembered. The gate
+still measures the default: `trees=30` against a threshold of 20.
+
+### 2026-09-13 — Node textures ship at 16x16, superseding the 32x32 decision — **REVERTED, see above**
 
 Supersedes "Bright-luminous art canon, 32x32, designed pack only" (13 September) on the resolution
 only. The palette, the designed-pack-only rule and the bot canon are unchanged.

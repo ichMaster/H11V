@@ -2,6 +2,19 @@
 # Start H11V on the PocketTerm35 from inside (or over ssh into) the Sway session.
 # Deployed next to the game by tools/deploy_to_term35.sh; also runnable by hand.
 cd "$(dirname "$0")"
+
+# Launched from the Sway menu there is no terminal to print to, so anything that
+# goes wrong before the window opens would vanish. Everything this script says is
+# therefore also appended to a log next to the game, and a failure raises a
+# swaynag banner rather than simply not starting — "I tapped it and nothing
+# happened" is the least debuggable bug report there is.
+exec > >(tee -a "$(dirname "$0")/run_on_pi.log") 2>&1
+fail() {
+	echo "run_on_pi: $*" >&2
+	command -v swaynag >/dev/null 2>&1 && \
+		swaynag -t error -m "H11V failed to start: $*" >/dev/null 2>&1 &
+	exit 1
+}
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 if [ -z "${WAYLAND_DISPLAY:-}" ]; then
   export WAYLAND_DISPLAY="$(ls "$XDG_RUNTIME_DIR" | grep -m1 '^wayland-[0-9]*$')"
@@ -70,10 +83,16 @@ fi
 
 # Luanti 5.10 renamed the binary; a Debian package may install either name.
 # Use whichever is present rather than assuming.
-LUANTI="$(command -v luanti || command -v minetest)" || {
-  echo "error: neither luanti nor minetest is installed on this device" >&2
-  exit 1
-}
+#
+# /usr/games is on PATH in a login shell and NOT in the environment a desktop
+# launcher or a systemd user unit hands you — and Debian puts the luanti wrapper
+# exactly there. Searching PATH alone means the game starts from a terminal and
+# does nothing at all from the Sway menu, which is the least debuggable failure
+# a user can be given. So PATH is widened first, then searched.
+PATH="$PATH:/usr/games:/usr/local/games:/usr/local/bin"
+export PATH
+LUANTI="$(command -v luanti || command -v minetest || true)"
+[ -n "$LUANTI" ] || fail "neither luanti nor minetest is installed (looked on PATH and /usr/games)"
 
 # The deployed tree is self-contained: ./game is the H11V game, ./minetest.conf
 # is base + profile assembled on the Mac.
@@ -96,10 +115,7 @@ ln -s "$PWD/game" "$USER_DIR/games/h11v"
 # later and elsewhere -- the deploy script reports "the game did not stay up" for
 # a game that copied perfectly and simply could not be resolved.
 if ! "$LUANTI" --gameid list 2>&1 | grep -qx 'h11v'; then
-  echo "error: the engine cannot see the h11v game." >&2
-  echo "       linked $PWD/game -> $USER_DIR/games/h11v, but --gameid list does not list it." >&2
-  echo "       Check the link target exists and game.conf is readable." >&2
-  exit 1
+  fail "the engine cannot see the h11v game (linked $PWD/game -> $USER_DIR/games/h11v)"
 fi
 
 # The world has to exist before --go will use it: the engine creates a world from

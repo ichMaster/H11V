@@ -227,6 +227,15 @@ if [ "$fresh" = 1 ]; then
 	echo "==> removed the device world; it will regenerate"
 fi
 
+# The Sway desktop entry. v0's outcome is that the game "launches fullscreen from
+# the Sway desktop", not only from this script — so the launcher is part of the
+# deploy rather than something set up by hand once and lost on the next reflash.
+# wofi --show drun reads ~/.local/share/applications directly, so no database
+# refresh is needed.
+"${SSH[@]}" "$TARGET" "mkdir -p ~/.local/share/applications"
+sed "s|@REMOTE@|/home/$DEV_USER/$REMOTE_DIR|g" "$ROOT/tools/device/h11v.desktop" \
+	| "${SSH[@]}" "$TARGET" "cat > ~/.local/share/applications/h11v.desktop"
+
 if [ "$do_run" = 0 ]; then
 	echo "==> copied. Start it on the device with:  ~/$REMOTE_DIR/run_on_pi.sh"
 	exit 0

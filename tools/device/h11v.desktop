@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=H11V
+GenericName=Game
+Comment=A pocket voxel world that an algorithm slowly rewrites
+# @REMOTE@ is substituted by tools/deploy_to_term35.sh with the deployment
+# directory's absolute path. The launcher must run run_on_pi.sh rather than the
+# engine directly: that script owns the Sway scale dance, the DISPLAY the
+# XWayland build needs, the game symlink and the world creation. Pointing a menu
+# entry straight at `luanti` would start something that looks like the game and
+# is not.
+Exec=@REMOTE@/run_on_pi.sh
+Icon=@REMOTE@/game/menu/icon.png
+Terminal=false
+Categories=Game;AdventureGame;
+Keywords=h11v;voxel;minecraft;luanti;

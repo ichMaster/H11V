@@ -17,6 +17,7 @@ than in Pillow for the same reason.
 
 import argparse
 import pathlib
+import re
 import struct
 import sys
 import zlib
@@ -276,6 +277,23 @@ def main():
             findings.append(f"{name}: height {img.height} is not a whole number of {img.width}px frames")
         elif img.height // img.width != want_frames:
             findings.append(f"{name}: {img.height // img.width} frames, ART.md orders {want_frames}")
+
+    # Every texture the Lua actually names must exist. ART.md's contract says what
+    # the pack must contain; this says the code and the pack agree on spelling —
+    # the half that a delivery audit cannot see. A mistyped name in a NODES row is
+    # not an engine error: it is an unknown-texture placeholder, which looks like
+    # an art problem and is a typo.
+    lua_dir = base / "mods" / "h11_world"
+    tex_dir = base / TEX
+    if lua_dir.is_dir() and tex_dir.is_dir():
+        named = set()
+        for lua in sorted(lua_dir.glob("*.lua")):
+            named |= set(re.findall(r'"(h11_[a-z0-9_]+\.png)"', lua.read_text()))
+        have = {f.name for f in tex_dir.glob("*.png")}
+        for name in sorted(named - have):
+            findings.append(f"{name}: named in h11_world Lua but not installed in {TEX}/")
+        if args.verbose:
+            print(f"  ok  {len(named)} texture reference(s) in Lua all resolve")
 
     # The hotbar must be eight identical cells so a 6-slot crop stays lossless.
     bar = images.get("h11_hotbar.png")

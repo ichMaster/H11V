@@ -12,8 +12,14 @@
 # one form that behaves the same in both shells. LUANTI_SERVER is still exported,
 # for printing in diagnostics only.
 #
-# Returns non-zero if the engine is not installed, so a caller can fail with its
-# own message.
+# Returns non-zero and sets LUANTI_MISSING=1 if the engine is not installed. A
+# caller running `set -e` must source it as
+#
+#   . tools/luanti_path.sh || true
+#
+# and then check LUANTI_MISSING -- sourcing it bare under `set -e` aborts the
+# caller at the `.` line, before it can print its own message, which is precisely
+# the outcome the return code exists to avoid.
 #
 # Why this file exists: the two target platforms package the server differently,
 # and hardcoding either name gives a red gate that reads like a bug in the game.
@@ -65,7 +71,11 @@ fi
 export LUANTI LUANTI_SERVER LUANTI_VERSION
 
 # Sourced, so `return`; guard it in case someone executes the file anyway.
+LUANTI_MISSING=0
 if [ -z "$LUANTI" ]; then
+	LUANTI_MISSING=1
+	export LUANTI_MISSING
 	return 1 2>/dev/null || exit 1
 fi
+export LUANTI_MISSING
 return 0 2>/dev/null || exit 0

@@ -86,6 +86,6 @@ if [ "$local_mode" = 0 ] && ! echo "$RENDERER" | grep -qi "V3D"; then
 fi
 
 echo
-echo "PASS: hardware renderer.${local_mode:+}"
+echo "PASS: hardware renderer on $WHERE."
 echo "Record this line in docs/decisions.md beside any measurement it justifies:"
 echo "   ${RENDERER#*: }"

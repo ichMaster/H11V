@@ -60,20 +60,37 @@ if [ -n "$OUTPUT" ] && [ "$OLD_SCALE" != "1.000000" ] && [ "$OLD_SCALE" != "1" ]
   swaymsg output "$OUTPUT" scale 1 >/dev/null 2>&1
 fi
 
-# Luanti 5.10 renamed the binary and the user directory; a Debian package may
-# still install either. Use whichever is present rather than assuming.
+
+# Luanti 5.10 renamed the binary; a Debian package may install either name.
+# Use whichever is present rather than assuming.
 LUANTI="$(command -v luanti || command -v minetest)" || {
   echo "error: neither luanti nor minetest is installed on this device" >&2
   exit 1
 }
 
 # The deployed tree is self-contained: ./game is the H11V game, ./minetest.conf
-# is base + profile assembled on the Mac. --gameid needs the game visible in a
-# games/ directory, so point the engine's user path at a directory we own here.
-USER_DIR="$PWD/userdata"
-mkdir -p "$USER_DIR/games" "$USER_DIR/worlds"
-rm -f "$USER_DIR/games/h11v"
+# is base + profile assembled on the Mac.
+#
+# The game has to be findable by id, and the engine has NO --userdata flag: it
+# looks in its share path and in its own user directory, and nowhere else. So the
+# game is linked into that user directory. Which one it is depends on the build --
+# 5.10 on this device still uses the pre-rename ~/.minetest -- so detect rather
+# than assume, and create the legacy name only as the fallback.
+USER_DIR="$HOME/.luanti"
+[ -d "$USER_DIR" ] || USER_DIR="$HOME/.minetest"
+mkdir -p "$USER_DIR/games"
+rm -rf "$USER_DIR/games/h11v"
 ln -s "$PWD/game" "$USER_DIR/games/h11v"
+
+# Prove the engine can see it before launching. Without this the failure surfaces
+# later and elsewhere -- the deploy script reports "the game did not stay up" for
+# a game that copied perfectly and simply could not be resolved.
+if ! "$LUANTI" --gameid list 2>/dev/null | grep -qx 'h11v'; then
+  echo "error: the engine cannot see the h11v game." >&2
+  echo "       linked $PWD/game -> $USER_DIR/games/h11v, but --gameid list does not list it." >&2
+  echo "       Check the link target exists and game.conf is readable." >&2
+  exit 1
+fi
 
 # Not exec: the trap above has to run when the game exits.
 "$LUANTI" \

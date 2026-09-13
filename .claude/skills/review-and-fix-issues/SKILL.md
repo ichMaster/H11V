@@ -45,8 +45,7 @@ the collision-layer model, the `Game` signal set, and the `Level` contract entit
 Be **adversarial** — hunt for *real* defects, not restatements of what works:
 - **Concurrency:** races at `await` points, read-then-write without the DB guard handled, async
   cancellation of cleanup (the §10 finally path), interleaving of two connections.
-- **Authority/identity:** any client claim trusted without server re-validation; seats by name not
-  token; observers acting; tokens leaking.
+- **Trust boundaries:** a brain's `Intent` acted on without validation; a bot tick that can block on the network; a mutation rule applied outside the cycle that owns it
 - **Correctness:** move-log replay edge cases, terminal-state handling (`current_turn: null`), the
   opaque-move round-trip, off-by-one/parity.
 - **Robustness:** malformed input, dropped sockets, unhandled exceptions that kill a connection.

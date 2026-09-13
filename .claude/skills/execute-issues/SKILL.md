@@ -237,7 +237,7 @@ Commit and push the report (`ARENA`-style message, with the Co-Authored-By trail
 - **No broken code.** Only commit code that passes validation (the acceptance gates).
 - **Checks ship with the feature.** A phase's DoD names the assertions it adds to `test_worldgen.sh`, `check_assets.py` or `test_worldgen.sh`;
   live calls are permitted and opt-in.
-- **Server is the ultimate authority.** LLM/client output is untrusted; re-validate every move server-side. Seats keyed by per-connection token, never by name; observers never hold a seat.
+- **The engine is the authority on the world.** A brain's reply is untrusted input: validate an `Intent` against the contract before a body acts on it, and never let a malformed or absent answer stall a tick — fall back to the StubBrain.
 - **`nodes.lua` owns the block catalogue.** Nothing outside it registers a node, and every later mechanic addresses blocks by the ids it defines.
 - **Contracts stay stable.** A seam change updates `specification/ARCHITECTURE.md` and its contract test in the same commit.
 - **Secrets stay out of the repo.** The device password lives only in the gitignored `.term35-connect.txt`; never hardcode it, echo it, or put it in a command's argv.

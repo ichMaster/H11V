@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "_comment": "The event contract. Prose mirror: architecture.md §2-3, updated in the same commit as this file.",
+  "_comment": "The event contract. Prose mirror: architecture.md §2-3, updated in the same commit as this file. issue.validate.end requires only `attempt`: this project has five named gates (check_lua, test_worldgen, check_assets, run_local, device) rather than the two the kit was born with, so gate results ride in a `gates` object; `pytest`/`mypy` stay accepted for logs written by the original kit.",
 
   "envelope": {
     "required": ["v", "ts", "run_id", "type", "scope", "emitter"],
@@ -47,7 +47,7 @@
     "issue.start":          { "data": ["size", "area"] },
     "issue.uploaded":       { "data": ["issue", "gh_number", "url"] },
     "issue.implement.end":  { "data": ["files_changed"] },
-    "issue.validate.end":   { "data": ["attempt", "pytest", "mypy"] },
+    "issue.validate.end":   { "data": ["attempt"] },
     "issue.commit":         { "data": ["sha", "files"] },
     "issue.closed":         { "data": ["issue", "gh_number"] },
     "issue.failed":         { "data": ["attempt", "reason"] },

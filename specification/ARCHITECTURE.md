@@ -34,7 +34,7 @@ axis is allowed to change alone.
 | Bot pathfinding | `core.find_path` |
 | Persistent state | mod storage |
 | Brain HTTP calls | `core.request_http_api` (the mod must be listed in `secure.http_mods`) |
-| Headless tests | `luantiserver` |
+| Headless tests | a dedicated server — `luantiserver` on Debian/Pi OS, `luanti --server` from the macOS bundle; `tools/luanti_path.sh` resolves which |
 
 ## Components
 
@@ -147,7 +147,7 @@ There is no unit-test framework for the game. A change is validated by five comm
 
 ```bash
 tools/check_lua.sh                        # parse: luac -p over every .lua, no syntax errors
-tools/test_worldgen.sh                    # world: luantiserver emerges 128x128, asserts, exits 0
+tools/test_worldgen.sh                    # world: a headless server emerges 128x128, asserts, exits 0
 tools/check_assets.py                     # art: names, sizes, alpha regimes, tiling, no metadata
 tools/run_local.sh                        # Mac: a 640x480 window, walk, dig, place
 tools/deploy_to_term35.sh --profile=mid   # device: it runs, on the GPU, at a measured frame rate
@@ -163,7 +163,8 @@ never into a new framework.
 
 ### What `test_worldgen.sh` actually does
 
-It builds a throwaway world directory and enables a tiny test-only world mod — living under `tools/`,
+It resolves the platform's server invocation with `tools/luanti_path.sh`, builds a throwaway world
+directory and enables a tiny test-only world mod — living under `tools/`,
 never shipped inside the game — which on server start force-emerges the area, scans it with a
 VoxelManip, prints one parseable result line, and calls `core.request_shutdown()`. The script greps
 that line, applies the phase's thresholds and exits 0 or 1. The game itself contains no test code.

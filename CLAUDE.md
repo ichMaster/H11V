@@ -43,7 +43,7 @@ Target device: **Waveshare PocketTerm35** — Raspberry Pi 5 / 4 GB, 3.5" 640x48
 | Persistent state | mod storage |
 | Brain HTTP calls | `core.request_http_api` (mod must be listed in `secure.http_mods`) |
 | Bot pathfinding | `core.find_path` |
-| Headless tests | `luantiserver` |
+| Headless tests | `luantiserver` (Pi) / `luanti --server` (Mac) — `tools/luanti_path.sh` resolves it |
 
 Godot 4 + godot_voxel was considered and rejected for this project; Unity/Unreal are out (no Linux arm64 story on the Pi).
 

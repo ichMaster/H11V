@@ -91,9 +91,9 @@ coherent, independently shippable slice:
 - Map each issue to part of the phase Tasks; together they must satisfy the phase **DoD**.
 - **Bake tests into every issue** (the LLM is mocked by default; live calls are opt-in): unit for
   pure logic, contract for any seam, an integration turn where relevant.
-- A seam change — the map language, the `interact`/`hit` contracts, the `Game` signal set, the collision layers, a `data/` table shape, or (from v6) the wire event/action
-  protocol (§6.2), or the seat-by-token identity model (§5.2) — carries a
-  `specification/ARCHITECTURE.md` update + its contract test in the **same** issue.
+- A seam change — the `NODES` table shape, the mutation rule table, a mod boundary, or (from v2) the
+  `Perception → Intent` contract — carries a `specification/ARCHITECTURE.md` update + its contract
+  test in the **same** issue. `Perception → Intent` additionally needs a line in `docs/decisions.md`.
 - Stay **within the phase** — don't pull later phases' scope in early (MVP-first per
   the §2 scope table).
 

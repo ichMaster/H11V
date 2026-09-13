@@ -41,7 +41,7 @@ There is no unit-test framework for the game. A change is validated by five comm
 
 ```bash
 tools/check_lua.sh                        # parse: luac -p over every .lua, no syntax errors
-tools/test_worldgen.sh                    # world: luantiserver emerges the area, asserts, exits 0
+tools/test_worldgen.sh                    # world: a headless server emerges the area, asserts, exits 0
 tools/check_assets.py                     # art: names, sizes, alpha regimes, tiling, no metadata
 tools/run_local.sh                        # Mac: a 640x480 window, walk, dig, place
 tools/deploy_to_term35.sh --profile=mid   # device: it runs, on the GPU, at a measured frame rate
@@ -54,7 +54,8 @@ assertions it adds; they go into `test_worldgen.sh` or `check_assets.py` — nev
 framework.
 
 **Two gates are unusual enough to state plainly.** `test_worldgen.sh` runs a headless
-`luantiserver` with a test-only world mod that lives under `tools/` and never ships inside the game;
+server (`tools/luanti_path.sh` resolves the platform's invocation) with a test-only world mod that
+lives under `tools/` and never ships inside the game;
 it prints one parseable line and shuts the server down. And the device gate's numbers are void
 unless the GPU preflight is green — a software rasterizer draws the world correctly and makes every
 frame-rate claim fiction. See [ARCHITECTURE.md](ARCHITECTURE.md) §The GPU path.

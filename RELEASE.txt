@@ -1,0 +1,33 @@
+H11V release log
+================
+
+Newest first. A release is cut per roadmap phase (vA.B -> A.B.0); a post-release
+fix on that phase bumps the third number. See specification/SDLC.md.
+
+
+0.1.0 — 2026-09-13 — v0.1 Toolchain and skeleton
+------------------------------------------------
+
+The engine runs on both machines, the device renders on its GPU, and H11V exists
+as a game Luanti will load.
+
+  * Luanti 5.17.0 on the Mac, 5.10.0 on the PocketTerm35. The seven-version skew
+    is deliberate: Debian's package uses the system Mesa the device ships, where
+    a Flatpak would inject its own into the measurement v0 exists to take. The
+    mod API surface must therefore stay inside 5.10's.
+  * GPU preflight GREEN: V3D 7.1.7.0 via EGL, no llvmpipe fallback. Any frame
+    rate measured without this line green is void. tools/gpu_preflight.sh makes
+    the check repeatable.
+  * games/h11v with game.conf and an empty h11_world whose init.lua documents the
+    load order v0.2 and v0.5 will fill in. Verified headless: the server listens
+    for gameid h11v and creates a world.
+  * tools/luanti_path.sh resolves the headless server across both platforms —
+    macOS ships no luantiserver, only a --server flag on a bundled binary.
+  * docs/decisions.md seeded with the decisions closed during specification plus
+    everything v0.1 learned.
+  * Four specification corrections forced by what the engine actually does, and
+    four code-review findings fixed before release.
+
+  Known and owned: an empty game logs three "Mapgen alias ... is invalid!" errors
+  because the engine demands those aliases before any node exists to satisfy
+  them. v0.2's DoD closes them.

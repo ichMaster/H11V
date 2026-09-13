@@ -4,6 +4,54 @@ H11V release log
 Newest first. A release is cut per roadmap phase (vA.B -> A.B.0); a post-release
 fix on that phase bumps the third number. See specification/SDLC.md.
 
+0.8.0 — 2026-09-14 — the colony retheme
+---------------------------------------
+
+  * The world stops looking like Minecraft. Not by recolouring it -- grass, soil,
+    bark, leaves and cobble ARE the Minecraft vocabulary, and a recolour cannot
+    escape a vocabulary -- but by replacing it. A lander came down on an
+    unsurveyed mineral planet: bone regolith, crystal spires instead of forest,
+    green-teal meltwater, and the colony's own hardware to build with.
+  * 13 blocks, in two halves that must be distinguishable at eight pixels. The
+    planet: regolith, fines, lithic, drift, spire, bloom, meltwater, H11 crust.
+    The colony: hull, prefab, crate, beacon.
+  * The beacon is the point of the second half. Until now the only way to see at
+    night was to stand near something H11 had rewritten; a player should be able
+    to light their own camp. It emits 14 against the crust's 12, so where the two
+    meet the colony's lamp wins.
+  * The wield item is the scanner from the references, not a gauntlet. The first
+    four hotbar slots are the colony's blocks -- the ones you build with, and the
+    ones reachable without cycling.
+  * A new art pack (specification/art/colony/), accepted after two revisions, and
+    a brief whose section 4.1 is binding: a value ladder with at least 8 L*
+    between neighbours, 60 degrees of hue for anything closer. It exists because
+    this fiction wants four kinds of pale mineral and the device has no shadows to
+    tell them apart. The palette itself was left to the designer; only the rules
+    were fixed.
+  * The v0 node ids stay resolvable as aliases. Not a migration -- pre-rename
+    worlds were already accepted as test fixtures -- but an unresolvable id
+    renders as a magenta error cube, and a world that merely looks wrong beats a
+    world full of them.
+  * Architecture gains two sections it will need before v2: the build catalogue
+    (a model emits a plan over authored parts with sockets, never coordinates)
+    and mutation as an infection from a focus, whose frontier is a pure function
+    of position, cycle and seed so laziness and determinism can coexist. That
+    settles the M4 question about catching up missed cycles: they are not
+    replayed.
+
+  Two findings the gates could not have produced, both from a screenshot:
+
+  * The growth density was unchanged by the retheme and still wrong. 0.032 suited
+    green canopies; the same geometry in magenta covered the world in a solid pink
+    field with the terraces, the water and the sense of scale behind it. Now 0.010
+    -- about 160 growths, scattered groves, terrain visible between them.
+  * test_worldgen.sh had been asserting `trees >= 20` while its own comment said
+    this was the DoD's "at least 20 trees in a 128x128 area". It was not: `trees`
+    counts sampled columns, one in sixteen, so the gate silently demanded 320. It
+    passed for as long as the margin was wide and went red the moment the density
+    dropped. The probe now reports `growths`, and the sampling step is a named
+    constant rather than a literal in the loop.
+
 0.7.3 — 2026-09-13 — Select cycles the hotbar
 ---------------------------------------------
 

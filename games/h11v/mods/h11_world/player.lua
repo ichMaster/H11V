@@ -68,12 +68,23 @@ end)
 -- instant a player joins.
 local WATER_LEVEL = 6
 
+-- get_spawn_level knows the TERRAIN and nothing about what grows on it, so a
+-- column it calls a fine surface may have a tree standing on it — and the player
+-- arrives embedded in a trunk, staring at brown. (Seen on the device: the overlay
+-- read `pointed: h11_world:trunk` with the whole screen the colour of bark.)
+--
+-- The map is not loaded at join time, so the trees cannot be looked up; instead
+-- the candidates are spread far enough apart that a single 5x5 canopy cannot
+-- cover two of them, and the fallback keeps walking outward.
 local function spawn_for(x, z)
 	local y = core.get_spawn_level(x, z)
 	-- nil means the mapgen has no suitable surface there (underwater, or outside
 	-- the generated region). Above the water line, or the player arrives swimming.
 	if y and y > WATER_LEVEL then
-		return { x = x, y = y + 0.5, z = z }
+		-- +2 rather than +0.5: clear of a trunk's first node if one is there, and
+		-- a short fall onto the ground is unremarkable, while spawning inside a
+		-- block is not.
+		return { x = x, y = y + 2, z = z }
 	end
 	return nil
 end
@@ -81,7 +92,7 @@ end
 local function find_spawn()
 	-- Spiral outward from the origin. On a map that is mostly land this succeeds
 	-- on the first or second try; the loop exists for the case where it does not.
-	for radius = 0, 60, 6 do
+	for radius = 0, 60, 8 do
 		if radius == 0 then
 			local pos = spawn_for(0, 0)
 			if pos then return pos end
@@ -98,10 +109,51 @@ local function find_spawn()
 	return nil
 end
 
+-- Placing in two steps, because neither step alone is enough.
+--
+-- get_spawn_level gives a terrain height without needing a loaded map, but knows
+-- nothing about what grows on that terrain — so on its own it drops the player
+-- inside a tree, which at this tree density is common rather than unlucky.
+-- Reading the actual nodes would know about trees, but at join time the map is
+-- not loaded and every read returns "ignore".
+--
+-- So: use the mapgen's answer to pick a candidate, emerge a small area around it,
+-- and only then read the nodes and find real air. The player stands still for the
+-- fraction of a second that takes, which is invisible, and arrives on grass
+-- rather than inside bark.
+local function settle(player, candidate)
+	local pos = vector.new(candidate)
+	local min = vector.new(pos.x - 2, pos.y - 12, pos.z - 2)
+	local max = vector.new(pos.x + 2, pos.y + 12, pos.z + 2)
+
+	core.emerge_area(min, max, function(_, _, remaining)
+		if remaining ~= 0 then return end
+		if not player:is_player() then return end
+
+		-- Walk down to the first solid node, stepping over anything growing, then
+		-- stand on top of it.
+		for y = max.y, min.y, -1 do
+			local here = core.get_node({ x = pos.x, y = y, z = pos.z }).name
+			if here ~= "air" and here ~= "ignore" then
+				local above = core.get_node({ x = pos.x, y = y + 1, z = pos.z }).name
+				local head = core.get_node({ x = pos.x, y = y + 2, z = pos.z }).name
+				if above == "air" and head == "air" then
+					player:set_pos({ x = pos.x, y = y + 1.5, z = pos.z })
+					return
+				end
+				-- Solid, but something is standing on it (a trunk, a canopy).
+				-- Keep descending; the loop will find the ground under the tree,
+				-- and if that is also blocked the candidate is simply a bad one.
+			end
+		end
+	end)
+end
+
 local function place(player)
 	local pos = find_spawn()
 	if pos then
-		player:set_pos(pos)
+		player:set_pos(pos)    -- immediately, so the player is never in the void
+		settle(player, pos)    -- then properly, once the map around them exists
 		return true
 	end
 	core.log("warning", "[h11_world] no spawn above water found; leaving the engine's default")

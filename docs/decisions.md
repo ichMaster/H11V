@@ -293,3 +293,24 @@ Still owed by a person at the device, and the reason v0.7 is not yet closed:
 - how the bright-luminous palette holds up at night
 - whether the H11 glyph reads on the crust block at normal viewing distance
 - whether touch digging and placing actually feel right, which no capture can show
+
+### 2026-09-13 — Node textures ship at 16x16, superseding the 32x32 decision — **on trial**
+
+Supersedes "Bright-luminous art canon, 32x32, designed pack only" (13 September) on the resolution
+only. The palette, the designed-pack-only rule and the bot canon are unchanged.
+
+Node textures are halved 2:1 from the authored 32x32, nearest-neighbour, by
+`tools/downscale_pack.py`. Verified by eye before it was adopted: the pack is drawn in roughly
+2-pixel clusters, so taking every other pixel reproduces the art rather than approximating it, and
+the H11 glyph on the crust block is if anything crisper at 16. UI art and the hand are not scaled —
+they are sized in screen pixels or extruded into a mesh.
+
+**This is explicitly reversible and is not yet closed.** `tools/install_assets.sh --res=32` puts the
+authored resolution back in one command: the delivery of record in `specification/art/h11v/` is never
+modified, and `tools/check_assets.py` detects the installed resolution instead of being told it, so
+nothing else has to change in either direction. The 32x32 decision stands as the fallback until this
+one is confirmed on the panel.
+
+**What confirms it:** the same judgement v0.7 has been waiting on — whether 16x16 reads better than
+32x32 at 3.5 inches. That question was the reason both sizes were ever in play, and it is answered by
+looking at the device, not by reasoning about it here.

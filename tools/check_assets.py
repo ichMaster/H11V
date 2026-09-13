@@ -30,6 +30,43 @@ PACK = ROOT / "specification" / "art" / "h11v"
 TEX = "mods/h11_world/textures"
 MENU = "menu"
 
+# Node textures are authored at 32x32 and ship at 16x16, halved 2:1 by
+# tools/downscale_pack.py at install. So the same contract has two valid sizes
+# depending on which tree is being checked, and the tables below are written at
+# the AUTHORING size with the game tree scaled down by NODE_SCALE. Writing two
+# tables instead would be two places for the alpha regimes and colour budgets to
+# drift apart.
+#
+# UI art and the menu images are sized in screen pixels and are not scaled.
+TARGET_NODE_PX = 16     # must match tools/downscale_pack.py TARGET
+NODE_SCALE = 1          # resolved below from what is actually installed
+
+
+def detect_node_scale(base):
+    """Read the installed node resolution instead of being told it.
+
+    The project can ship node textures at the authored 32x32 or at a halved
+    16x16, switched by tools/install_assets.sh --res. A flag here would be a
+    second place to set that, and therefore a place for the two to disagree —
+    so the gate measures the tree in front of it. h11_dirt.png is the reference
+    because it is a plain opaque square with no variants.
+
+    A tree where the node textures disagree with each other is a half-finished
+    install, and saying so is more useful than validating against either size.
+    """
+    tex = base / TEX
+    ref = tex / "h11_dirt.png"
+    if not ref.is_file():
+        return 1, None
+    try:
+        width = Png(ref).width
+    except Exception:                                   # noqa: BLE001
+        return 1, None
+    authored = NODE_TEXTURES["h11_dirt.png"][0]
+    if width <= 0 or authored % width:
+        return 1, None
+    return authored // width, width
+
 # name -> (width, height, alpha regime, max colours)
 #   "opaque"  every pixel fully opaque
 #   "binary"  every pixel either fully transparent or fully opaque
@@ -179,7 +216,7 @@ def edge_report(img):
     return wrap_v, int_v, wrap_h, int_h
 
 
-def check_one(path, spec, findings, warnings, verbose):
+def check_one(path, spec, findings, warnings, verbose, scalable=False):
     name = path.name
     want_w, want_h, regime, max_colours = spec
     try:
@@ -188,8 +225,19 @@ def check_one(path, spec, findings, warnings, verbose):
         findings.append(f"{name}: cannot read ({exc})")
         return None
 
+    # In the game tree the node textures have been halved; UI and menu art has not.
+    #
+    # Two conditions, both of which tools/downscale_pack.py also applies: the file
+    # is a node texture rather than UI or menu art, and it was authored wider than
+    # the target. Sharing the reasoning rather than a list of names is what keeps
+    # the 16x16 glyph overlays unscaled in both tools without either naming them —
+    # and what stopped this check from trying to halve the 1920x1080 menu
+    # background on its first draft.
+    if not PACK_MODE and scalable and want_w > TARGET_NODE_PX:
+        want_w, want_h = want_w // NODE_SCALE, want_h // NODE_SCALE
     if (img.width, img.height) != (want_w, want_h):
-        findings.append(f"{name}: is {img.width}x{img.height}, ART.md orders {want_w}x{want_h}")
+        where = "the authored pack" if PACK_MODE else "the shipped game"
+        findings.append(f"{name}: is {img.width}x{img.height}, {where} wants {want_w}x{want_h}")
 
     alphas = img.alphas()
     if regime == "opaque" and alphas != {255}:
@@ -229,7 +277,7 @@ def main():
     ap.add_argument("--verbose", "-v", action="store_true")
     args = ap.parse_args()
 
-    global PACK_MODE
+    global PACK_MODE, NODE_SCALE
     PACK_MODE = args.pack
     base = PACK if args.pack else GAME
     where = base.relative_to(ROOT)
@@ -240,20 +288,27 @@ def main():
                   "or check the delivery itself with --pack.", file=sys.stderr)
         return 1
 
-    print(f"check_assets: {where}")
     findings, warnings, images = [], [], {}
 
-    for folder, table, required in ((TEX, NODE_TEXTURES, True),
-                                    (TEX, UI_TEXTURES, True),
-                                    (MENU, MENU_IMAGES, True),
-                                    (TEX, OPTIONAL, False)):
+    if PACK_MODE:
+        NODE_SCALE = 1
+        print(f"check_assets: {where} (authored size)")
+    else:
+        NODE_SCALE, node_px = detect_node_scale(base)
+        print(f"check_assets: {where} (node textures {node_px or '?'}px)")
+
+    # scalable: node textures under textures/, which is what the downscaler touches.
+    for folder, table, required, scalable in ((TEX, NODE_TEXTURES, True, True),
+                                              (TEX, UI_TEXTURES, True, False),
+                                              (MENU, MENU_IMAGES, True, False),
+                                              (TEX, OPTIONAL, False, True)):
         for name, spec in table.items():
             path = base / folder / name
             if not path.exists():
                 if required:
                     findings.append(f"{name}: missing from {folder}/")
                 continue
-            img = check_one(path, spec, findings, warnings, args.verbose)
+            img = check_one(path, spec, findings, warnings, args.verbose, scalable)
             if img:
                 images[name] = img
 
@@ -273,6 +328,8 @@ def main():
         img = images.get(name)
         if not img:
             continue
+        # Halving preserves the frame COUNT, which is what the contract is about —
+        # the strip is 8 or 16 square frames whatever the edge length.
         if img.height % img.width:
             findings.append(f"{name}: height {img.height} is not a whole number of {img.width}px frames")
         elif img.height // img.width != want_frames:

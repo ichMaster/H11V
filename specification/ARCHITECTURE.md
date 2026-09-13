@@ -130,15 +130,23 @@ Assets are content, not code. The designed pack lives in `specification/art/h11v
 exact mirror of `games/h11v/`, so installing it is one command and no renaming:
 
 ```bash
-rsync -a --exclude .DS_Store specification/art/h11v/  games/h11v/
+tools/install_assets.sh              # 16x16, the shipping resolution
+tools/install_assets.sh --res=32     # 32x32, the authored size
 ```
 
-Then strip the content-credential metadata every delivered PNG carries — 146 KiB across the pack,
-up to 97% of a single 32x32 file, and it crosses the network on every deploy:
+That is the whole install and the whole rollback: it rsyncs the pack in, halves the node textures
+unless `--res=32`, and strips the content-credential metadata every delivered PNG carries — 146 KiB
+across the pack, up to 97% of a single file, crossing the network on every deploy.
 
-```bash
-tools/strip_png_metadata.py games/h11v
-```
+**Node textures are authored at 32x32 and ship at 16x16.** The delivered pack is drawn in roughly
+2-pixel clusters, so taking every other pixel reproduces the artist's intent rather than
+approximating it; the H11 glyph is if anything crisper at 16. Keeping the 32x32 set as the master
+means an HD pack costs nothing later and a re-delivery need not be redrawn twice. UI art and the
+first-person hand are **not** scaled — they are sized in screen pixels or extruded into a mesh.
+
+`tools/check_assets.py` detects the installed resolution rather than being told it, so the gate
+follows the choice automatically and a half-finished install (node textures disagreeing with each
+other) is reported as such.
 
 Code references the filenames in [ART.md](ART.md) §5 and nothing else. The pack under
 `specification/` is the delivery of record and is never edited in place: a re-delivery is a drop-in

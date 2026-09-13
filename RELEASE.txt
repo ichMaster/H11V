@@ -4,6 +4,37 @@ H11V release log
 Newest first. A release is cut per roadmap phase (vA.B -> A.B.0); a post-release
 fix on that phase bumps the third number. See specification/SDLC.md.
 
+0.6.0 — 2026-09-13 — v0.6 Device profiles and scripts
+----------------------------------------------------
+
+The game runs on the PocketTerm35. One command deploys it, one stops it, and the
+Mac runs it the same way.
+
+  * Three graphics profiles assembled from a shared base, so a profile switch is
+    a redeploy rather than an edit on the device.
+  * tools/run_local.sh — the Mac, same config, same 640x480.
+  * The deploy starts the game over ssh and it outlives the session.
+
+  Getting there disproved most of what the specification assumed:
+
+  The device's Luanti is the legacy Irrlicht X11 build — libX11, no SDL, no EGL,
+  no GLESv2. It contains the strings "ogles2" and "opengl3" and rejects both,
+  then dies asking for a DISPLAY. Only opengl is compiled in; the path is
+  GLX -> XWayland -> V3D. Still hardware (direct rendering: Yes), but not the
+  path the specification described.
+
+  The GPU preflight was verifying a path the game does not take. It asked EGL,
+  which answered V3D correctly and said nothing about the renderer the game would
+  get. A check that verifies the wrong path is not weaker, it is false.
+
+  --gameid list prints to stderr on 5.10 and stdout on 5.17, so v0.1's
+  visibility guard blocked a deploy that would have worked. A guard producing
+  false positives is worse than no guard, because it is believed.
+
+  Also: the engine will not create a world from the command line; its log appends
+  across runs, so the renderer check would have reported a stale line forever;
+  and --stop returned on signal delivery rather than process exit.
+
 0.5.0 — 2026-09-13 — v0.4 The asset pack + v0.5 The player layer
 ----------------------------------------------------------------
 

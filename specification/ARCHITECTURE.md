@@ -100,15 +100,25 @@ body (fast ticks)  ──Perception──>  brain  ──Intent──>  body
 
 ## The GPU path
 
-Rendering on the device is hardware or the milestone is void. SDL video on Wayland
-(`SDL_VIDEODRIVER=wayland`, set by `tools/run_on_pi.sh`), EGL + GL ES 2 through Mesa's V3D driver on
-the Pi 5's VideoCore VII, selected in the config as `video_driver = ogles2`.
+Rendering on the device is hardware or the milestone is void.
+
+**The path is GLX on XWayland, not EGL on Wayland** — established by measurement in v0.6, not by
+design. Debian trixie's `luanti` 5.10 is the legacy Irrlicht X11 build: linked against `libX11`, with
+no SDL, no EGL and no GLESv2. It rejects both `ogles2` and `opengl3` at runtime despite containing
+those strings, so the config says `video_driver = opengl`, and `tools/run_on_pi.sh` sets `DISPLAY=:0`
+because over ssh there is none. It still reaches the hardware: `direct rendering: Yes`,
+`OpenGL renderer string: V3D 7.1.7.0`.
+
+A future device build linked against SDL would render natively on Wayland through EGL; nothing here
+depends on which, only on the renderer being V3D rather than a software rasterizer.
 
 The failure mode this guards against is silent: with a broken EGL setup Mesa falls back to
 `llvmpipe`, everything still draws, and every frame-rate number becomes fiction. So:
-`glxinfo -B` / `eglinfo` must name **V3D**, `LIBGL_ALWAYS_SOFTWARE` must not be set, the renderer
-line in the engine's debug log must not contain `llvmpipe`, and `tools/deploy_to_term35.sh` reads
-that line back after every launch and says so loudly. The renderer string goes into
+`glxinfo -B` must name **V3D** *on the display the game will use* — `tools/gpu_preflight.sh` probes
+GLX first for exactly this reason, after an earlier version asked EGL and got a correct answer about
+a path the game never takes. `LIBGL_ALWAYS_SOFTWARE` must not be set, the renderer line in the
+engine's debug log must not contain `llvmpipe`, and `tools/deploy_to_term35.sh` reads that line back
+after every launch and says so loudly. The renderer string goes into
 `docs/decisions.md` beside the numbers it justifies.
 
 On the Mac no such guard is needed — Apple's GL is always hardware — which is exactly why

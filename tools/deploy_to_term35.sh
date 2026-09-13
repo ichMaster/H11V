@@ -4,6 +4,7 @@
 #   tools/deploy_to_term35.sh                 copy the game + mid profile, start it
 #   tools/deploy_to_term35.sh --profile=low   pick the graphics profile (low|mid|high)
 #   tools/deploy_to_term35.sh --fresh         delete the device world first
+#   tools/deploy_to_term35.sh --uncapped      lift fps_max (for measuring only)
 #   tools/deploy_to_term35.sh --no-run        copy only, do not start
 #   tools/deploy_to_term35.sh --stop          stop whatever is running on the device
 #   tools/deploy_to_term35.sh --log           tail the game log on the device
@@ -26,11 +27,12 @@ GAME_SRC="$ROOT/games/h11v"
 REMOTE_DIR="h11v"
 PROFILE="mid"
 
-do_run=1 setup_key=0 stop_only=0 log_only=0 fresh=0
+do_run=1 setup_key=0 stop_only=0 log_only=0 fresh=0 uncapped=0
 for arg in "$@"; do
 	case "$arg" in
 		--profile=*) PROFILE="${arg#*=}" ;;
 		--fresh) fresh=1 ;;
+		--uncapped) uncapped=1 ;;
 		--no-run) do_run=0 ;;
 		--setup-key) setup_key=1 ;;
 		--stop) stop_only=1 ;;
@@ -178,6 +180,14 @@ trap 'rm -f "$CONF_TMP"' EXIT
 	cat "$ROOT/tools/device/minetest.conf"
 	echo
 	cat "$ROOT/tools/device/device-$PROFILE.conf"
+	# Measuring a profile against its own fps_max measures the fps_max. Appended
+	# last so it wins, and only when asked for: the cap is a real shipping choice
+	# and must not be lost by accident.
+	if [ "$uncapped" = 1 ]; then
+		echo
+		echo "# --uncapped: measurement only, not a shipping value"
+		echo "fps_max = 250"
+	fi
 } > "$CONF_TMP"
 
 # --- copy --------------------------------------------------------------------

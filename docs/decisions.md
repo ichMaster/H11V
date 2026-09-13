@@ -240,3 +240,56 @@ nothing and **blocked a deploy that would have worked**.
 a debugging session, and it promptly caused one of its own in the opposite direction. A guard that
 produces false positives is worse than no guard, because it is believed. Both `run_on_pi.sh` and
 `run_local.sh` now capture both streams.
+
+---
+
+## v0.7 — The measurement session
+
+### 2026-09-13 — The device has ample headroom at 30 fps, and cannot hold 60
+
+Measured on the PocketTerm35, fixed seed 20260913, each profile deployed fresh, the debug overlay
+read from a screenshot after a 25-second walk. Renderer **V3D 7.1.7.0**, preflight green — without
+that line none of the below would count.
+
+| profile | `viewing_range` set | achieved | fps (cap) | **drawtime** |
+|---|---|---|---|---|
+| low | 40 | 40 | 29 (30) | **2 ms** |
+| mid | 60 | 60 | 29 (30) | **3 ms** |
+| high | 100 | **60** | 29 (60) | 3 ms |
+
+**Low and mid hold their 30 fps cap with room to spare.** A drawtime of 2–3 ms against a 33 ms budget
+means the GPU is doing almost nothing: the V3D is not the constraint at these settings, and there is
+a great deal of headroom for what v1 and v2 will add.
+
+**High does not reach 60 fps**, and the engine responds by cutting the view range from the configured
+100 down to 60 on its own — and still lands at 29. So 60 fps is not available at this range on this
+device, and asking for it costs view distance rather than buying frames.
+
+**Therefore: `mid` is the default profile.** It is the most the device delivers without the engine
+overriding the setting, and it holds its cap.
+
+### 2026-09-13 — Raising `fps_max` destroys the measurement it is meant to enable
+
+Luanti steers `viewing_range` toward `fps_max`: it reduces the range when the target is not being
+met. So the obvious way to find out "what can this device really do" — lift the cap and look — does
+the opposite. With `fps_max = 250`, both low and mid reported **`view range: 40`** and ~74 fps,
+because the engine had quietly cut mid's configured 60 to chase a target it could never reach.
+
+**Decision:** each profile is measured at its own shipping cap, and **`drawtime` is the number that
+carries the information** — the real per-frame render cost, which neither the cap nor the
+range-steering touches. `tools/deploy_to_term35.sh --uncapped` still exists for deliberate
+experiments, and `tools/measure_device.sh` no longer uses it.
+
+### 2026-09-13 — What the screenshots do not settle
+
+`tools/measure_device.sh` gets the conditions identical and captures the evidence; it does not read a
+frame rate off its own screenshot and write it down. Deliberately: a script confidently OCR-ing the
+one measurement this milestone exists to take is a very efficient way to be wrong.
+
+Still owed by a person at the device, and the reason v0.7 is not yet closed:
+
+- legibility of the 32×32 textures at 3.5 inches, and whether 32×32 was the right call over 16×16
+- graininess and shimmer on distant blocks while moving
+- how the bright-luminous palette holds up at night
+- whether the H11 glyph reads on the crust block at normal viewing distance
+- whether touch digging and placing actually feel right, which no capture can show

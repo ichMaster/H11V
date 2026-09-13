@@ -57,44 +57,73 @@ core.register_biome({
 
 --- Mapgen parameters.
 --
--- Set as defaults, not forced: a world that already exists keeps the parameters
--- it was created with, and overriding them would silently change an existing
--- map's terrain between runs. v0.7 measures a fixed seed, so stability matters
--- more than any particular value here.
-core.set_mapgen_setting("mg_name", "v7", false)
-core.set_mapgen_setting("water_level", "1", false)
+-- OVERRIDE, not default, and the difference is the whole reason this comment
+-- exists. set_mapgen_setting's third argument looks like "don't clobber a world
+-- that already has a value", but the engine writes its OWN defaults into
+-- map_meta.txt when the world is created, which happens before mods load. So
+-- `false` does not mean "unless it exists" — it means "never", including for a
+-- brand new world. v0.2 shipped these tuned and inert: the terrain it measured
+-- was stock v7, not ours.
+--
+-- The cost is real and accepted: an existing map re-tuned on next load grows a
+-- seam where old and new chunks meet. In v0 no world outlives a test run, and
+-- v0.7 measures a fixed seed on a fresh world, so a setting that applies is
+-- worth more than one that cannot.
+core.set_mapgen_setting("mg_name", "v7", true)
+-- Water level above the terrain's mean, not below it. v0.2 put the base at 6 and
+-- the water at 1, so the island generated entirely above the water line: the map
+-- had lakes in principle and none in fact, and the gate honestly reported
+-- water=0. The sea is the datum here, and the terrain rises out of it.
+core.set_mapgen_setting("water_level", "6", true)
 
 -- No caves, no dungeons, no floatlands in v0. Every one of them is geometry the
 -- device has to render and v0 exists to find out what the device can do with the
 -- simple case first. They are cheap to switch on later, and expensive to have
 -- confounded a measurement.
-core.set_mapgen_setting("mg_flags", "nocaves,nodungeons,light,decorations,biomes", false)
+core.set_mapgen_setting("mg_flags", "nocaves,nodungeons,light,decorations,biomes", true)
 
 --- Terrain shape: a pocket island rather than a continent.
 --
--- v7's base terrain is a broad, slow noise meant for an endless world. On a
--- 128x128 map that reads as a featureless tilt. Shortening the spread and
--- lifting the octave count gives a horizon with hills inside the area the player
--- can actually walk — which is what the v0.2 DoD asks for when it demands an
--- elevation range of at least 8 blocks.
+-- v7 does not take its height from one noise. It computes
+--
+--     if alt > base then height = alt
+--     else height = base * height_select + alt * (1 - height_select)
+--
+-- so tuning terrain_base alone moves almost nothing: the blend and the
+-- short-circuit swamp it. That is why v0.2's numbers refused to budge no matter
+-- what base was set to.
+--
+-- So the blend is made deterministic and base is left as the only dial:
+-- height_select is pinned to a constant 1, and terrain_alt is kept in a narrow
+-- band that can never exceed base. Height is then simply terrain_base, which is
+-- what a 128x128 pocket world wants — a designer needs one number to turn, not
+-- three interacting ones tuned for an endless continent.
+core.set_mapgen_setting_noiseparams("mgv7_np_height_select", {
+	offset = 1, scale = 0,
+	spread = { x = 500, y = 500, z = 500 },
+	seed = 4213, octaves = 1, persistence = 0.5, lacunarity = 2.0,
+}, true)
+
+-- Never dominant: a gentle undulation that rides under the base rather than
+-- replacing it via the short-circuit above.
+core.set_mapgen_setting_noiseparams("mgv7_np_terrain_alt", {
+	offset = 0, scale = 2,
+	spread = { x = 100, y = 100, z = 100 },
+	seed = 5934, octaves = 3, persistence = 0.6, lacunarity = 2.0,
+}, true)
+
+-- The one dial. Water level is 6, so an offset of 15 with a scale of 12 puts the
+-- land mostly above the sea and drops the lowest hollows into it — bays and
+-- lakes rather than either a lawn or a swamp. Spread 120 rather than v7's stock
+-- 600 puts whole hills inside the area a player can walk.
 core.set_mapgen_setting_noiseparams("mgv7_np_terrain_base", {
-	offset = 6,
+	offset = 12,
 	scale = 12,
 	spread = { x = 120, y = 120, z = 120 },
 	seed = 82341,
 	octaves = 4,
 	persistence = 0.6,
 	lacunarity = 2.0,
-}, false)
-
-core.set_mapgen_setting_noiseparams("mgv7_np_terrain_alt", {
-	offset = 4,
-	scale = 10,
-	spread = { x = 100, y = 100, z = 100 },
-	seed = 5934,
-	octaves = 4,
-	persistence = 0.6,
-	lacunarity = 2.0,
-}, false)
+}, true)
 
 core.log("action", "[h11_world] mapgen wired: v7, one technical biome, 3 structural aliases")

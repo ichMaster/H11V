@@ -141,3 +141,43 @@ roboface project documents for the same reason.
 **Consequence:** v3 inference is CPU-bound on four cores. "An answer in 1–3 seconds for three bots"
 points at a small quantized model, and it is one more reason the body never waits on a reply.
 Narrows — but does not close — open question 2 in [VISION.md](../specification/VISION.md).
+
+---
+
+## v0.3 — Water and trees
+
+### 2026-09-13 — Mapgen settings are overrides, not defaults (correcting v0.2)
+
+`core.set_mapgen_setting(..., false)` and `set_mapgen_setting_noiseparams(..., false)` do **not** mean
+"set unless this world already has a value". The engine writes its own defaults into `map_meta.txt`
+when the world is created, and that happens **before mods load** — so `false` means *never*, for a
+brand-new world as much as an old one.
+
+**Why it matters:** v0.2 registered its terrain tuning with `false` and reported an elevation range of
+19 as evidence the tuning worked. It did not: that number came from stock v7 noise. The settings were
+inert. All five are now `true`.
+
+**What it costs, accepted:** an existing map re-tuned on next load grows a seam where old and new
+chunks meet. In v0 no world outlives a test run, and v0.7 measures a fixed seed on a fresh world.
+A setting that applies is worth more than one that cannot. This supersedes the reasoning recorded in
+the v0.2 execution report.
+
+### 2026-09-13 — v7's height is a blend, so the blend is pinned
+
+v7 does not take terrain height from one noise:
+
+```
+if alt > base then height = alt
+else height = base * height_select + alt * (1 - height_select)
+```
+
+Tuning `terrain_base` alone therefore moves almost nothing — the short-circuit and the blend swamp
+it. This is the second reason v0.2's numbers refused to budge.
+
+**Decision:** `mgv7_np_height_select` is pinned to a constant 1 and `mgv7_np_terrain_alt` is kept in a
+narrow band that cannot exceed base, leaving **`mgv7_np_terrain_base` as the single dial** for
+terrain shape.
+
+**Why:** a 128×128 pocket world needs one number a designer can turn, not three interacting ones
+tuned for an endless continent. With water level 6, offset 12 and scale 12 give elevation range 19,
+turf on 93% of sampled columns and water on 7% — lakes and a shoreline rather than a lawn or a swamp.

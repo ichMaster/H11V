@@ -728,3 +728,36 @@ carry the H11 stencil.
 at M4. It is now answered: lazily, at block load, via LBM (the engine tracks
 `lbm_introduction_times` in `env_meta.txt` for exactly this), computing the missed cycles from the
 frontier function rather than replaying them.
+
+## The colony retheme
+
+### 2026-09-14 — A gate that had been asserting sixteen times what it claimed
+
+`test_worldgen.sh` checked `trees >= 20` and its own comment said this was the v0.3 DoD, *"at least 20
+trees in a 128x128 area"*. It was not. `trees` counts **sampled columns** containing a spire, and the
+probe walks every 4th column on both axes — one column in sixteen. The threshold was therefore
+demanding about **320 growths**, sixteen times what anyone wrote down.
+
+**It passed for a year of commits because the margin was enormous**, and went red the instant the
+margin shrank for an unrelated reason. That is the failure mode worth remembering: a wrong assertion
+with a comfortable margin is indistinguishable from a right one until something moves.
+
+The probe now reports `growths` — the sample scaled by the step — and `STEP` is a named constant
+instead of a literal `4` in the loop, because the scale-up depends on it and a literal in one place
+with a constant in another is how two numbers quietly stop agreeing. `trees` survives as a floor
+(`>= 4`) that still catches a schematic placing nothing.
+
+### 2026-09-14 — The same density, a different world: 0.032 magenta is not 0.032 green
+
+The retheme changed the textures and nothing about the geometry, and the first device screenshot came
+back as a **solid pink field to the horizon** — no terraces, no water, no sense of scale. Nothing was
+broken: `test_worldgen` had just reported `surface_top=regolith 93%`, `water=70`, `trees=31`, all
+green, describing a world that was unplayable to look at.
+
+v0's 0.032 was tuned for green canopies, where a dense wood still reads as ground with trees on it.
+The identical geometry in magenta reads as a roof. Now **0.010** — roughly 160 growths, scattered
+groves, terrain visible between them, and the crowns still the loudest thing in the frame.
+
+**Neither of these was findable from the gates.** Every acceptance check was green while the world was
+wrong, and the only reason either is known is a screenshot pulled off the device with `grim`. The
+gates prove the world contains what it should; they have no opinion about whether it can be looked at.

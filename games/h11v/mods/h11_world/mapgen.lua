@@ -23,17 +23,17 @@
 -- is invalid!" for precisely these three and no others.
 
 -- The structural nodes, which the generator places directly.
-core.register_alias("mapgen_stone", "h11_world:stone")
-core.register_alias("mapgen_water_source", "h11_world:water_source")
+core.register_alias("mapgen_stone", "h11_world:lithic")
+core.register_alias("mapgen_water_source", "h11_world:melt_source")
 -- River water has no separate node in v0: the pocket world has lakes and a sea,
 -- not rivers. Pointing it at the same source keeps the engine quiet and the
 -- world consistent; v1 may give rivers their own node when biomes arrive.
-core.register_alias("mapgen_river_water_source", "h11_world:water_source")
+core.register_alias("mapgen_river_water_source", "h11_world:melt_source")
 
 -- Mandatory for any game, even one with no caves or dungeons: the engine asks
 -- for them during decoration and dungeon placement whether or not it uses them.
-core.register_alias("mapgen_lava_source", "h11_world:stone")
-core.register_alias("mapgen_cobble", "h11_world:stone")
+core.register_alias("mapgen_lava_source", "h11_world:lithic")
+core.register_alias("mapgen_cobble", "h11_world:lithic")
 
 --- The surface.
 --
@@ -43,11 +43,11 @@ core.register_alias("mapgen_cobble", "h11_world:stone")
 -- H11V biomes arrive in v1.1, and they replace this rather than extend it.
 core.register_biome({
 	name = "h11v:island",
-	node_top = "h11_world:turf",
+	node_top = "h11_world:regolith",
 	depth_top = 1,
-	node_filler = "h11_world:dirt",
+	node_filler = "h11_world:fines",
 	depth_filler = 2,
-	node_riverbed = "h11_world:sand",
+	node_riverbed = "h11_world:drift",
 	depth_riverbed = 2,
 	y_max = 200,
 	y_min = -100,
@@ -126,23 +126,39 @@ core.set_mapgen_setting_noiseparams("mgv7_np_terrain_base", {
 	lacunarity = 2.0,
 }, true)
 
---- Trees.
+--- Crystal growths.
+--
+-- Shaped like a tree because the engine's decoration system is built around
+-- trunks and canopies, and because a stalk with a crown is a silhouette the eye
+-- already parses. It is not a tree in any other respect: a faceted spire with a
+-- crown of hanging filaments, nothing wooden anywhere near it
+-- (specification/ART-COLONY.md §2).
 --
 -- A schematic handed to the engine, not an ABM and not an on_generated loop:
 -- decorations are placed once, with the chunk, by the mapgen thread. Nothing
--- about a tree costs anything per tick afterwards, which is the whole point on a
--- device whose frame budget v0.7 is about to measure.
+-- about a growth costs anything per tick afterwards, which is the whole point on
+-- a device whose frame budget v0.7 measured.
 --
--- No leafdecay either. That is a per-tick ABM over every leaf in view, and v0
+-- No leafdecay either. That is a per-tick ABM over every filament in view, and v0
 -- exists to learn what the device does with the simple case first.
 
--- The shipped density. tools/deploy_to_term35.sh --trees=N overrides it for a
--- look at the terrain; the gate's "trees >= 20" is measured against the default.
-local TREE_DENSITY = tonumber(core.settings:get("h11v_tree_density")) or 0.032
+-- The shipped density, decided on the device rather than at a desk.
+--
+-- v0 shipped 0.032 and it was right for green canopies: a wooded island you could
+-- still see across. The colony retheme changed nothing about the geometry and
+-- everything about the reading — magenta crowns at the same density covered the
+-- world in a solid pink field, with the terraces, the water and the whole sense
+-- of scale lost behind it. The first screenshot after the retheme is the only
+-- reason this is known.
+--
+-- 0.010 puts roughly 160 growths on the 128x128 map: scattered groves, terrain
+-- visible between them, and the crowns still loud enough to be the thing the eye
+-- goes to. tools/deploy_to_term35.sh --trees=N overrides it.
+local TREE_DENSITY = tonumber(core.settings:get("h11v_tree_density")) or 0.010
 
 local _ = "air"      -- readability in the layer tables below
-local T = "h11_world:trunk"
-local L = "h11_world:leaves"
+local T = "h11_world:spire"
+local L = "h11_world:bloom"
 
 -- Probabilities: 255 is always, 0 is never. The corners of the canopy are given
 -- middling odds so that no two trees are quite the same shape — a forest of
@@ -157,9 +173,9 @@ local tree = {
 
 -- ORDER MATTERS AND IS NOT THE OBVIOUS ONE. A schematic's `data` is a flat array
 -- the engine reads as [z [y [x]]] — z outermost, x innermost. Building it
--- layer-by-layer (y outermost), which is how a human thinks about a tree, writes
+-- layer-by-layer (y outermost), which is how a human thinks about a growth, writes
 -- every node to the wrong coordinate: the result generates without error and
--- looks like trunks floating beside their own canopies. Found by screenshotting
+-- looks like stalks floating beside their own crowns. Found by screenshotting
 -- the device, because nothing in a log or a block count can see it.
 local layers = {
 	-- y = 0..2: the trunk alone
@@ -200,13 +216,13 @@ for z = 1, 5 do
 end
 
 core.register_decoration({
-	name = "h11_world:tree",
+	name = "h11_world:spire_growth",
 	deco_type = "schematic",
-	place_on = { "h11_world:turf" },
+	place_on = { "h11_world:regolith" },
 	sidelen = 16,
-	-- Tuned for a wooded island rather than a forest or a lawn: dense enough that
-	-- the 128x128 map clears the DoD's 20 trees with room to spare, sparse enough
-	-- that the player can see across it.
+	-- Tuned for a scattered field of growths rather than a thicket or a bare
+	-- plain: dense enough that the 128x128 map clears the DoD's 20 with room to
+	-- spare, sparse enough that the player can see across it.
 	-- Overridable so the terrain can be inspected without editing the shipped
 	-- value. Judging the SHAPE of the world — how far it runs, how tall the hills
 	-- are, whether 128x128 feels like a place — is impossible from inside a

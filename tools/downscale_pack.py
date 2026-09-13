@@ -46,7 +46,7 @@ import zlib
 # on the panel or coarsens the extrusion, neither of which is what "16x16
 # textures" means.
 SKIP = {
-    "crosshair.png", "h11_hand.png", "h11_hotbar.png", "h11_hotbar_selected.png",
+    "crosshair.png", "h11_scanner.png", "h11_hotbar.png", "h11_hotbar_selected.png",
 }
 
 # Nothing is taken below the target resolution. Named by size rather than by file,

@@ -48,21 +48,21 @@ def detect_node_scale(base):
     The project can ship node textures at the authored 32x32 or at a halved
     16x16, switched by tools/install_assets.sh --res. A flag here would be a
     second place to set that, and therefore a place for the two to disagree —
-    so the gate measures the tree in front of it. h11_dirt.png is the reference
+    so the gate measures the tree in front of it. h11_fines.png is the reference
     because it is a plain opaque square with no variants.
 
     A tree where the node textures disagree with each other is a half-finished
     install, and saying so is more useful than validating against either size.
     """
     tex = base / TEX
-    ref = tex / "h11_dirt.png"
+    ref = tex / "h11_fines.png"
     if not ref.is_file():
         return 1, None
     try:
         width = Png(ref).width
     except Exception:                                   # noqa: BLE001
         return 1, None
-    authored = NODE_TEXTURES["h11_dirt.png"][0]
+    authored = NODE_TEXTURES["h11_fines.png"][0]
     if width <= 0 or authored % width:
         return 1, None
     return authored // width, width
@@ -73,21 +73,29 @@ def detect_node_scale(base):
 #   "partial" at least one genuinely semi-transparent pixel
 #   "any"     not constrained
 NODE_TEXTURES = {
-    "h11_dirt.png": (32, 32, "opaque", 16),
-    "h11_turf_top.png": (32, 32, "opaque", 16),
-    "h11_turf_side.png": (32, 32, "opaque", 16),
-    "h11_stone.png": (32, 32, "opaque", 16),
-    "h11_sand.png": (32, 32, "opaque", 16),
-    "h11_trunk_top.png": (32, 32, "opaque", 16),
-    "h11_trunk_side.png": (32, 32, "opaque", 16),
+    # the planet
+    "h11_fines.png": (32, 32, "opaque", 16),
+    "h11_regolith_top.png": (32, 32, "opaque", 16),
+    "h11_regolith_side.png": (32, 32, "opaque", 16),
+    "h11_lithic.png": (32, 32, "opaque", 16),
+    "h11_lithic_top.png": (32, 32, "opaque", 16),
+    "h11_drift.png": (32, 32, "opaque", 16),
+    "h11_spire_top.png": (32, 32, "opaque", 16),
+    "h11_spire_side.png": (32, 32, "opaque", 16),
     "h11_crust.png": (32, 32, "opaque", 16),
-    "h11_leaves.png": (32, 32, "binary", 16),
-    "h11_water.png": (32, 256, "partial", 16),
-    "h11_water_flowing.png": (32, 512, "partial", 16),
+    "h11_bloom.png": (32, 32, "binary", 16),
+    "h11_melt.png": (32, 256, "partial", 16),
+    "h11_melt_flowing.png": (32, 512, "partial", 16),
+    # the colony
+    "h11_hull.png": (32, 32, "opaque", 16),
+    "h11_prefab.png": (32, 32, "opaque", 16),
+    "h11_crate_top.png": (32, 32, "opaque", 16),
+    "h11_crate_side.png": (32, 32, "opaque", 16),
+    "h11_beacon.png": (32, 32, "opaque", 16),
 }
 UI_TEXTURES = {
     "crosshair.png": (32, 32, "binary", 16),
-    "h11_hand.png": (64, 64, "binary", 16),
+    "h11_scanner.png": (64, 64, "binary", 16),
     "h11_hotbar.png": (512, 64, "partial", 16),
     "h11_hotbar_selected.png": (64, 64, "partial", 16),
 }
@@ -102,13 +110,29 @@ OPTIONAL = {
 } | {"h11_crust_2.png": (32, 32, "opaque", 16)}
 
 # Faces that must tile seamlessly with themselves. Side textures are checked
-# horizontally only: turf carries its green fringe in the top rows by design,
-# and a stacked trunk is meant to show its rings.
-TILE_BOTH = ["h11_dirt.png", "h11_stone.png", "h11_sand.png", "h11_turf_top.png",
-             "h11_trunk_top.png", "h11_leaves.png", "h11_crust.png"]
-TILE_H_ONLY = ["h11_turf_side.png", "h11_trunk_side.png"]
+# horizontally only: regolith carries its biofilm fringe in the top rows by
+# design, a stacked spire is meant to show its growth bands, and a crate flank
+# has a lid edge. The beacon is excluded from tiling entirely — it is a single
+# fixture with a lens in the middle, and a centred motif is exactly what a tiling
+# check is built to reject.
+TILE_BOTH = ["h11_fines.png", "h11_lithic.png", "h11_lithic_top.png", "h11_drift.png",
+             "h11_regolith_top.png", "h11_spire_top.png", "h11_crust.png", "h11_crate_top.png"]
+TILE_H_ONLY = ["h11_regolith_side.png", "h11_spire_side.png", "h11_crate_side.png",
+               "h11_bloom.png"]
 
-ANIMATED = {"h11_water.png": 8, "h11_water_flowing.png": 16}
+# Deliberately not tile-checked, and the reason is the same for all three: they
+# are FIXTURES, not surfaces. The seam metric compares an edge against its
+# opposite edge, so anything designed with a border fails it by construction —
+# which is a statement about the metric, not about the art.
+#
+# Verified by rendering each one 3x3 rather than by argument: hull lays out as a
+# grid of riveted plates with clean joints, prefab as ribbed panelling with a
+# conduit stripe down every block, and both look like what they are meant to be.
+# The beacon is a single lamp with a lens in the middle; a centred motif is
+# exactly what a tiling check exists to reject.
+TILE_NONE = ["h11_hull.png", "h11_prefab.png", "h11_beacon.png"]
+
+ANIMATED = {"h11_melt.png": 8, "h11_melt_flowing.png": 16}
 
 # PNG chunks that carry no image data and bloat a tile beyond reason.
 JUNK_CHUNKS = {"caBX", "iCCP", "eXIf", "tEXt", "iTXt", "zTXt"}

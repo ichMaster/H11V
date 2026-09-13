@@ -19,82 +19,104 @@
 --               node needs (liquid plumbing, sounds). Kept separate so the common
 --               rows stay readable rather than every row carrying empty slots.
 --
+-- THE CATALOGUE IS IN TWO HALVES, and the split is the art direction rather than
+-- a filing convenience (specification/ART-COLONY.md §2). Everything here belongs
+-- to exactly one of two material languages and they are never blended:
+--
+--   GROWN  — the planet. Mineral, crystalline, cool. regolith, fines, lithic,
+--            drift, spire, bloom, meltwater, and the H11 crust.
+--   BUILT  — the colony. Machined, flat, seamed. hull, prefab, crate, beacon.
+--
+-- A player must be able to tell which half a block belongs to at eight pixels.
+-- That is why the beacon and the crust both emit light but look nothing alike:
+-- one is a lamp somebody bolted down, the other is the algorithm showing through.
+--
 -- TILE ORDER IS A TRAP. Luanti reads tiles as
 --     {top, bottom, right, left, back, front}
 -- with shorthand fill-in: one entry means all six faces, two means top/bottom
--- then the four sides, three means top, bottom, then sides. So turf needs a
--- THREE-element list with dirt explicitly in the middle. Give it two and the
--- green-fringed side texture is drawn on the block's underside, which looks
--- almost right from above and wrong from anywhere else. This is one of the three
--- engine strictnesses that fail silently rather than loudly.
+-- then the four sides, three means top, bottom, then sides. So regolith needs a
+-- THREE-element list with fines explicitly in the middle. Give it two and the
+-- crusted side texture is drawn on the block's underside, which looks almost
+-- right from above and wrong from anywhere else. This is one of the three engine
+-- strictnesses that fail silently rather than loudly.
 
 local S = core.get_translator and core.get_translator("h11_world") or function(s) return s end
 
 --- The catalogue. Order is presentation order, not load-bearing.
 local NODES = {
+	----------------------------------------------------------------- the planet
 	{
-		id = "stone",
-		description = S("H11 Stone"),
-		tiles = { "h11_stone.png" },
+		-- Bedrock. The darkest rung of the value ladder (ART-COLONY.md §4.1), so
+		-- cliff faces read against the pale ground rather than merging with it.
+		-- Three tiles because exposed bedrock has a weathered top face worth
+		-- seeing; the same face serves underneath, as a cut plate should.
+		id = "lithic",
+		description = S("Lithic Bedrock"),
+		tiles = { "h11_lithic_top.png", "h11_lithic_top.png", "h11_lithic.png" },
 		groups = { cracky = 3, stone = 1 },
 	},
 	{
-		id = "dirt",
-		description = S("Dirt"),
-		tiles = { "h11_dirt.png" },
+		id = "fines",
+		description = S("Mineral Fines"),
+		tiles = { "h11_fines.png" },
 		groups = { crumbly = 3, soil = 1 },
 	},
 	{
-		-- Three tiles, not two: {top, bottom, sides}. See the note above.
-		id = "turf",
-		description = S("Turf"),
-		tiles = { "h11_turf_top.png", "h11_dirt.png", "h11_turf_side.png" },
+		-- The walkable surface: mineral crust with a thin biofilm, not turf. Three
+		-- tiles, not two: {top, bottom, sides}. See the note above.
+		id = "regolith",
+		description = S("Regolith"),
+		tiles = { "h11_regolith_top.png", "h11_fines.png", "h11_regolith_side.png" },
 		groups = { crumbly = 3, soil = 1 },
 	},
 	{
-		id = "sand",
-		description = S("Sand"),
-		tiles = { "h11_sand.png" },
+		id = "drift",
+		description = S("Drift"),
+		tiles = { "h11_drift.png" },
 		groups = { crumbly = 3, falling_node = 1, sand = 1 },
 	},
 	{
-		-- Two tiles: {top, sides}. The top repeats on the bottom, which is what a
-		-- cut log should look like from either end.
-		id = "trunk",
-		description = S("Trunk"),
-		tiles = { "h11_trunk_top.png", "h11_trunk_top.png", "h11_trunk_side.png" },
+		-- The "tree" of this world, and deliberately not one: a crystal stalk. Two
+		-- tiles: {top, sides}, the top repeating underneath, which is what a cut
+		-- growth should look like from either end.
+		--
+		-- `choppy` is kept as the dig group even though nothing here is wood. The
+		-- group is a hardness class, not a material claim, and renaming it would
+		-- mean re-teaching the hand in player.lua for no gain a player can see.
+		id = "spire",
+		description = S("Crystal Spire"),
+		tiles = { "h11_spire_top.png", "h11_spire_top.png", "h11_spire_side.png" },
 		groups = { choppy = 2, tree = 1 },
 	},
 	{
-		-- allfaces_optional lets the engine collapse leaves to a cheaper draw on
-		-- the low graphics profile, which is exactly what v0.7 measures.
-		id = "leaves",
-		description = S("Leaves"),
+		-- The crown: hanging crystal filaments. allfaces_optional lets the engine
+		-- collapse it to a cheaper draw on the low graphics profile, which is what
+		-- v0.7 measured.
+		id = "bloom",
+		description = S("Bloom"),
 		drawtype = "allfaces_optional",
-		tiles = { "h11_leaves.png" },
+		tiles = { "h11_bloom.png" },
 		groups = { snappy = 3, leafdecay = 3, leaves = 1 },
 		extra = { paramtype = "light", waving = 1, sunlight_propagates = true },
 	},
 	{
-		-- The H11 block: what the algorithm leaves behind. Registered from v0 so
-		-- the catalogue is complete and the art can be judged on the device in
-		-- v0.7, even though nothing places it until v1's mutation cycle.
+		-- The H11 block: what the algorithm leaves behind.
 		--
-		-- It is also, from v0, the only light in the game. Night on the device was
+		-- It is also one of only two lights in the game. Night on the device was
 		-- reported as "I can't see anything", and 5.10 offers no lever to brighten
 		-- it: there is no light_curve_* family in this build and display_gamma
 		-- measurably does nothing (1.0 and 2.5 render identically). In this engine
 		-- light comes from blocks, so the fix has to be a block.
 		--
-		-- Making it the crust rather than adding a torch is the point. ART.md
-		-- already says H11 leaves "a faint cyan-to-lilac glow" on everything it has
-		-- touched; a torch would be a new object with no art and no place in the
-		-- fiction, while a glowing crust is the fiction. From v1 the mutation front
-		-- will literally light the world as it spreads.
+		-- Making it the crust rather than adding a torch is the point. The art
+		-- canon already gives H11 a cyan-to-lilac glow on everything it has
+		-- touched; a torch would be a new object with no place in the fiction,
+		-- while a glowing crust is the fiction. From v1 the mutation front will
+		-- literally light the world as it spreads.
 		--
 		-- 12 of a possible 14: bright enough to work as a lamp, short of the
-		-- daylight ceiling, so a mutated region still reads as glowing rather than
-		-- as lit.
+		-- daylight ceiling, and one step below the colony's own beacon — the
+		-- player's light should be the better light.
 		id = "crust",
 		description = S("H11 Crust"),
 		tiles = { "h11_crust.png" },
@@ -102,18 +124,15 @@ local NODES = {
 		light = 12,
 	},
 	{
-		-- Source only in v0.2. Its flowing partner is v0.3's row, and the two must
-		-- be cross-referenced through liquid_alternative_* or the first shoreline
-		-- the player digs spawns unknown-node checkerboards.
-		id = "water_source",
-		description = S("Water"),
-		-- "liquid", not "liquidsource": the latter is not a Luanti drawtype, and an
-		-- unknown one falls back to a normal cube with no error — water that looks
-		-- like solid teal stone. ARCHITECTURE.md pins this.
+		-- Meltwater. "liquid", not "liquidsource": the latter is not a Luanti
+		-- drawtype, and an unknown one falls back to a normal cube with no error —
+		-- water that looks like solid stone. ARCHITECTURE.md pins this.
+		id = "melt_source",
+		description = S("Meltwater"),
 		drawtype = "liquid",
 		tiles = {
 			{
-				name = "h11_water.png",
+				name = "h11_melt.png",
 				animation = { type = "vertical_frames", aspect_w = 32, aspect_h = 32, length = 2.0 },
 			},
 		},
@@ -127,10 +146,13 @@ local NODES = {
 			is_ground_content = false,
 			drowning = 1,
 			liquidtype = "source",
-			liquid_alternative_flowing = "h11_world:water_flowing",
-			liquid_alternative_source = "h11_world:water_source",
+			liquid_alternative_flowing = "h11_world:melt_flowing",
+			liquid_alternative_source = "h11_world:melt_source",
 			liquid_viscosity = 1,
-			post_effect_color = { a = 90, r = 79, g = 179, b = 201 },
+			-- Sampled from the delivered texture (mean rgb 26,149,113): the tint
+			-- the screen takes when the player's head goes under. A leftover teal
+			-- from the v0 pack would have quietly disagreed with the water itself.
+			post_effect_color = { a = 90, r = 26, g = 149, b = 113 },
 		},
 	},
 	{
@@ -138,15 +160,12 @@ local NODES = {
 		-- digs spawns unknown-node checkerboards: the engine wants somewhere to
 		-- put the water that is no longer a source, and an unresolved
 		-- liquid_alternative_flowing is not somewhere.
-		--
-		-- "flowingliquid" is a real drawtype, unlike the "liquidsource" this file
-		-- briefly had for the source. Both names are pinned in ARCHITECTURE.md.
-		id = "water_flowing",
-		description = S("Flowing Water"),
+		id = "melt_flowing",
+		description = S("Flowing Meltwater"),
 		drawtype = "flowingliquid",
 		-- A flowing liquid draws from special_tiles, not tiles: the engine needs
 		-- the animated strip for the sloped faces it builds per flow direction.
-		tiles = { "h11_water.png" },
+		tiles = { "h11_melt.png" },
 		groups = { water = 3, liquid = 3, not_in_creative_inventory = 1 },
 		extra = {
 			paramtype = "light",
@@ -158,24 +177,65 @@ local NODES = {
 			is_ground_content = false,
 			drowning = 1,
 			liquidtype = "flowing",
-			liquid_alternative_flowing = "h11_world:water_flowing",
-			liquid_alternative_source = "h11_world:water_source",
+			liquid_alternative_flowing = "h11_world:melt_flowing",
+			liquid_alternative_source = "h11_world:melt_source",
 			liquid_viscosity = 1,
 			liquid_range = 7,
-			post_effect_color = { a = 90, r = 79, g = 179, b = 201 },
+			post_effect_color = { a = 90, r = 26, g = 149, b = 113 },
 			special_tiles = {
 				{
-					name = "h11_water_flowing.png",
+					name = "h11_melt_flowing.png",
 					backface_culling = false,
 					animation = { type = "vertical_frames", aspect_w = 32, aspect_h = 32, length = 0.8 },
 				},
 				{
-					name = "h11_water_flowing.png",
+					name = "h11_melt_flowing.png",
 					backface_culling = true,
 					animation = { type = "vertical_frames", aspect_w = 32, aspect_h = 32, length = 0.8 },
 				},
 			},
 		},
+	},
+
+	----------------------------------------------------------------- the colony
+	--
+	-- Four blocks that were made by people. Nothing places them: they exist so the
+	-- player can build, and so that what the player builds belongs to a different
+	-- world than the ground it stands on. From v2 they are also the materials the
+	-- part catalogue is assembled from (ARCHITECTURE.md, "The build catalogue").
+	{
+		id = "hull",
+		description = S("Hull Plate"),
+		tiles = { "h11_hull.png" },
+		groups = { cracky = 2, metal = 1 },
+	},
+	{
+		id = "prefab",
+		description = S("Prefab Panel"),
+		tiles = { "h11_prefab.png" },
+		groups = { cracky = 2, metal = 1 },
+	},
+	{
+		-- Two tiles: a lid, and a flank. A crate with one texture on all six faces
+		-- reads as a printed cube rather than as a box with a top.
+		id = "crate",
+		description = S("Cargo Crate"),
+		tiles = { "h11_crate_top.png", "h11_crate_top.png", "h11_crate_side.png" },
+		groups = { cracky = 3 },
+	},
+	{
+		-- The colony's own light, and the reason it exists: until now the only way
+		-- to see at night was to stand near something H11 had rewritten. A player
+		-- should be able to light their own camp without the algorithm's help.
+		--
+		-- 14 is the engine's maximum, one above the crust. That ordering is
+		-- deliberate — what the colony built is the better lamp, and where the two
+		-- meet the beacon wins.
+		id = "beacon",
+		description = S("Beacon"),
+		tiles = { "h11_beacon.png" },
+		groups = { cracky = 2, metal = 1 },
+		light = 14,
 	},
 }
 
@@ -208,6 +268,28 @@ end
 
 for index, row in ipairs(NODES) do
 	register(row, index)
+end
+
+--- The v0 names, kept resolvable.
+--
+-- A world generated before the colony retheme holds nodes called
+-- `h11_world:turf`, and an id the engine cannot resolve renders as the unknown
+-- node — a magenta-and-black checkerboard — rather than as anything explicable.
+-- Aliases cost one line each and turn "the world is full of error cubes" into "the
+-- world looks slightly wrong", which is the difference between a bug report and a
+-- shrug.
+--
+-- They are not a migration: the ground keeps the shape it generated with, and
+-- ART-COLONY.md §10 already accepted that pre-rename worlds are test fixtures
+-- rather than saves. These exist so the failure is legible, and they can be
+-- dropped once no such world remains.
+local RETIRED = {
+	turf = "regolith", dirt = "fines", stone = "lithic", sand = "drift",
+	trunk = "spire", leaves = "bloom",
+	water_source = "melt_source", water_flowing = "melt_flowing",
+}
+for old, new in pairs(RETIRED) do
+	core.register_alias("h11_world:" .. old, "h11_world:" .. new)
 end
 
 core.log("action", ("[h11_world] registered %d nodes"):format(#NODES))

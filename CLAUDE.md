@@ -20,14 +20,17 @@ only:
   gates, issue identity, and the `codegen/` instrumentation.
 - [ART.md](specification/ART.md) — part one the art canon, part two the asset-pack contract and the
   delivery audit. Filenames and sizes there are a contract with the code.
-- `specification/art/` — the three canonical reference images plus `h11v/`, the delivered asset pack.
+- [ART-COLONY.md](specification/ART-COLONY.md) — the current art canon and asset brief: the colony
+  direction, the binding separation rules, and the delivery audit.
+- `specification/art/` — `space/` (the two canonical references), `colony/` (the shipping pack),
+  plus the retired `ref-*.png` and `h11v/` from v0.
 - `specification/implementation/` — per-version issue and execution reports, written by the skills.
 
 ## What H11V is
 
 H11V is fully self-contained — no code, prompts, or assets come in from any other repository or project. It is a Minecraft-like voxel game for a pocket device where a first-person player and three bots share one small world (~128x128, no infinite generation), and the "H11 algorithm" mutates both the terrain and the creatures in slow, visible cycles driven by a data table of deterministic rules. There is no win condition.
 
-Art direction is **bright-luminous** (concept §12): vivid greens, ivory stone, lilac mutation crystal, cyan sci-fi HUD — never dark/horror. Textures are 32x32 and come exclusively from the designed asset pack (delivered 13.09.2026, in `specification/art/h11v/`); there is no procedural texture generation. The bots are canon: **DRIFT** (BOT 01, cyan, curiosity-driven), **ECHO** (BOT 02, amber, balanced observer), **MOSS** (BOT 03, green, safety/energy-driven), sharing the needs triad energy/curiosity/safety.
+Art direction is **the colony**: a lander came down on an unsurveyed, entirely mineral planet — bone regolith, crystal spires instead of forest, green-teal meltwater, and the colony's own white-and-amber hardware. Bright, luminous, uneasy-curious; never dark/horror. Textures are 32x32 and come exclusively from the designed asset pack (`specification/art/colony/`, accepted 14.09.2026 after two revisions); there is no procedural texture generation. [ART-COLONY.md](specification/ART-COLONY.md) is the canon and the brief — including §4.1, the binding colour-separation rules, which exist because this fiction wants four kinds of pale mineral and the device has no shadows to tell them apart. `ART.md` is retired as world canon and kept for the UI voice and the v0 record. The bots are canon: **DRIFT** (BOT 01, cyan, curiosity-driven), **ECHO** (BOT 02, amber, balanced observer), **MOSS** (BOT 03, green, safety/energy-driven), sharing the needs triad energy/curiosity/safety.
 
 Target device: **Waveshare PocketTerm35** — Raspberry Pi 5 / 4 GB, 3.5" 640x480 touchscreen + keyboard, Raspberry Pi OS with Sway (Wayland), **no mouse**. Development happens on a MacBook M1, so every feature needs both a Mac run path and a device run path.
 

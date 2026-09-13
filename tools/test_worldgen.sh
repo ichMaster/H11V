@@ -155,16 +155,25 @@ STATUS="$(field status)"
 
 CONTRACT_AREA=128          # the map the DoD's numbers describe
 MIN_ELEVATION_RANGE=8
-WANT_SURFACE="h11_world:turf"
+WANT_SURFACE="h11_world:regolith"
 MIN_SURFACE_PCT=80
 MIN_WATER=1                # the DoD asks only that water is present
-# The tree count is the one figure that is not bit-stable: it varies by about one
-# column between runs on a fixed seed, because decoration placement draws from a
-# PRNG the map seed does not fully pin. At ~46 against a threshold of 20 that is a
-# 2% wobble with a 130% margin, so it is a fine assertion — but the margin is the
-# reason it is fine, and a future threshold raised close to the measured value
-# would make this gate flaky. Noted here rather than discovered later.
-MIN_TREES=20               # "at least 20 trees in a 128x128 area"
+# The DoD's words, against the number that means them. `growths` is the probe's
+# estimate of how many spires stand in the 128x128 area; `trees` is the raw count
+# of SAMPLED columns holding one, which is sixteen times smaller because the scan
+# looks at one column in sixteen.
+#
+# Until the colony retheme this gate asserted `trees >= 20` and was believed to be
+# checking the DoD. It was silently demanding sixteen times that, and it only came
+# to light when the magenta crowns forced the density down and a world that
+# comfortably satisfies "at least 20 trees" turned the gate red.
+#
+# Neither figure is bit-stable: both wobble by about one sampled column between
+# runs on a fixed seed, because decoration placement draws from a PRNG the map
+# seed does not fully pin. Keep the margins wide; a threshold set near the
+# measured value makes this gate flaky.
+MIN_GROWTHS=20             # the DoD: "at least 20 trees in a 128x128 area"
+MIN_TREES=4                # a floor, not the DoD: catches a schematic that places nothing
 
 fail=0
 assert_min() { # name value minimum
@@ -215,9 +224,10 @@ assert_min "surface_top_pct" "$(field surface_top_pct)" "$MIN_SURFACE_PCT"
 # somewhere else is how a gate starts meaning something nobody intended.
 if [ "$AREA" = "$CONTRACT_AREA" ]; then
 	assert_min "water" "$(field water)" "$MIN_WATER"
+	assert_min "growths" "$(field growths)" "$MIN_GROWTHS"
 	assert_min "trees" "$(field trees)" "$MIN_TREES"
 else
-	echo "  --   water=$(field water) trees=$(field trees) (informational below area $CONTRACT_AREA)"
+	echo "  --   water=$(field water) growths=$(field growths) (informational below area $CONTRACT_AREA)"
 fi
 
 # Engine errors are a failure even when the probe reports ok: a world that

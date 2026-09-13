@@ -4,15 +4,19 @@
 -- there is no second concern to separate it from yet, and a mod boundary drawn
 -- before there is anything on the other side of it is just ceremony.
 
---- The hand.
+--- The hand, which is a scanner.
 --
 -- Luanti's default hand can barely dig anything: it is deliberately feeble so a
--- game can define its own tools. v0 has no tools, so the hand IS the tool, and it
--- must cover every dig group the NODES table uses — crumbly (soil and sand),
--- cracky (stone and crust), choppy (trunk), snappy (leaves). Miss one and that
--- block type is simply not diggable, with nothing in any log to say why.
+-- game can define its own tools. v0 has no tools, so this IS the tool, and it
+-- must cover every dig group the NODES table uses — crumbly (regolith, fines,
+-- drift), cracky (lithic, crust, and all four colony blocks), choppy (spire),
+-- snappy (bloom). Miss one and that block type is simply not diggable, with
+-- nothing in any log to say why.
 core.override_item("", {
-	wield_image = "h11_hand.png",
+	-- Not a bare hand: the scanner the player is holding in both canon references
+	-- (specification/ART-COLONY.md §6.3). It is still the engine's empty item, so
+	-- it still digs and places; only what you see changed.
+	wield_image = "h11_scanner.png",
 	wield_scale = { x = 1, y = 1, z = 2.5 },
 	tool_capabilities = {
 		full_punch_interval = 0.9,
@@ -29,18 +33,25 @@ core.override_item("", {
 
 --- What the player starts with.
 --
--- A stack of everything placeable. v0 is about walking, digging and placing on a
--- device — asking the player to mine a stack of stone before they can find out
--- whether building feels right on a touchscreen would be measuring the wrong
--- thing. Water is excluded: it is not placeable by hand, and a bucket is a
--- crafting mechanic v0 does not have.
+-- Exactly eight stacks, because the hotbar is exactly eight slots — a ninth would
+-- be invisible on the device and would look like an inventory bug.
+--
+-- The colony's four blocks come FIRST, in slots 1-4. They are what the player
+-- builds with, they are the half of the catalogue that makes this world a landing
+-- site rather than a biome, and the first four slots are the ones reachable
+-- without cycling. Planet materials fill 5-8; drift, bloom and fines are dug
+-- rather than given, since nothing about them needs testing on day one.
+--
+-- Meltwater is excluded: it is not placeable by hand, and a bucket is a crafting
+-- mechanic v0 does not have.
 local STARTING_INVENTORY = {
-	"h11_world:turf 64",
-	"h11_world:dirt 64",
-	"h11_world:stone 64",
-	"h11_world:sand 32",
-	"h11_world:trunk 32",
-	"h11_world:leaves 32",
+	"h11_world:hull 64",
+	"h11_world:prefab 64",
+	"h11_world:beacon 16",
+	"h11_world:crate 32",
+	"h11_world:regolith 64",
+	"h11_world:lithic 64",
+	"h11_world:spire 32",
 	"h11_world:crust 16",
 }
 
@@ -71,7 +82,8 @@ local WATER_LEVEL = 6
 -- get_spawn_level knows the TERRAIN and nothing about what grows on it, so a
 -- column it calls a fine surface may have a tree standing on it — and the player
 -- arrives embedded in a trunk, staring at brown. (Seen on the device: the overlay
--- read `pointed: h11_world:trunk` with the whole screen the colour of bark.)
+-- read `pointed: h11_world:trunk` with the whole screen the colour of bark —
+-- that block is called `spire` now, but the failure it describes is unchanged.)
 --
 -- The map is not loaded at join time, so the trees cannot be looked up; instead
 -- the candidates are spread far enough apart that a single 5x5 canopy cannot

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Install the asset pack into the game tree at a chosen node resolution.
 #
-#   tools/install_assets.sh              install at 16x16 (the shipping choice)
-#   tools/install_assets.sh --res=32     install at 32x32 (the authored size)
+#   tools/install_assets.sh              install at 32x32 (the shipping choice)
+#   tools/install_assets.sh --res=16     install at 16x16
 #
 # This is the whole of the asset install, and the whole of the rollback. The
 # delivered pack in specification/art/h11v/ is never modified — it stays the
@@ -19,9 +19,9 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PACK="$ROOT/specification/art/h11v"
+PACK="$ROOT/specification/art/colony"
 GAME="$ROOT/games/h11v"
-RES=16
+RES=32
 
 for arg in "$@"; do
 	case "$arg" in
@@ -35,6 +35,15 @@ case "$RES" in 16|32) ;; *) echo "error: --res must be 16 or 32" >&2; exit 2 ;; 
 [ -d "$PACK" ] || { echo "error: no pack at $PACK" >&2; exit 1; }
 
 echo "==> installing the asset pack at ${RES}x${RES}"
+
+# Clear the node textures first. rsync without --delete leaves whatever was there
+# before, and after the colony retheme that meant eleven v0 textures (h11_turf_*,
+# h11_dirt, h11_water*, h11_hand...) sitting in the tree with nothing referencing
+# them — invisible in game, shipped to the device on every deploy, and a trap for
+# the next person who greps for a texture name. Textures come only from the pack,
+# so emptying the directory is safe; everything else in $GAME is merged, not
+# replaced, because game.conf and the mods live there too.
+rm -rf "$GAME/mods/h11_world/textures"
 rsync -a --exclude '.DS_Store' "$PACK/" "$GAME/" || exit 1
 
 if [ "$RES" = 16 ]; then

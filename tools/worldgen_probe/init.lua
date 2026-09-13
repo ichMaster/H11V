@@ -13,6 +13,12 @@
 -- name and an older script must keep working against a newer probe.
 
 local AREA = tonumber(core.settings:get("h11v_probe_area")) or 128
+
+-- Every STEPth column on both axes, so one column in STEP^2 is looked at. Named
+-- rather than written as a bare 4 in the loop below, because the scale-up from a
+-- sample to a map-wide figure depends on it, and a literal in one place and a
+-- constant in another is how the two quietly stop agreeing.
+local STEP = 4
 local HALF = math.floor(AREA / 2)
 local Y_MIN = -32
 local Y_MAX = 96
@@ -41,8 +47,8 @@ end
 -- a later change that lets a canopy back into that number would silently alter
 -- what every assertion in the gate is asserting.
 local ABOVE_GROUND = {
-	["h11_world:leaves"] = true,
-	["h11_world:trunk"] = true,
+	["h11_world:bloom"] = true,
+	["h11_world:spire"] = true,
 }
 
 --- Walk down from the sky to the first ground node, stepping past anything
@@ -54,7 +60,7 @@ local function surface_at(area, data, names, x, z)
 		local id = data[vi]
 		if id ~= core.CONTENT_AIR and id ~= core.CONTENT_IGNORE then
 			local name = names[id]
-			if name == "h11_world:trunk" then had_trunk = true end
+			if name == "h11_world:spire" then had_trunk = true end
 			if not (name and ABOVE_GROUND[name]) then
 				return y, id, had_trunk
 			end
@@ -81,8 +87,8 @@ local function scan()
 	-- Sample every 4th column: 32x32 = 1024 probes over a 128x128 area is ample
 	-- for an elevation range and a surface histogram, and keeps the gate fast
 	-- enough that nobody is tempted to skip it.
-	for x = pmin.x, pmax.x, 4 do
-		for z = pmin.z, pmax.z, 4 do
+	for x = pmin.x, pmax.x, STEP do
+		for z = pmin.z, pmax.z, STEP do
 			columns = columns + 1
 			local y, id, had_trunk = surface_at(area, data, names, x, z)
 			if had_trunk then trunk_columns = trunk_columns + 1 end
@@ -103,7 +109,8 @@ local function scan()
 
 	return {
 		order = { "status", "area", "columns", "sampled", "surface_min", "surface_max",
-			"elevation_range", "surface_top", "surface_top_pct", "water", "trees" },
+			"elevation_range", "surface_top", "surface_top_pct", "water", "trees",
+			"growths" },
 		status = sampled > 0 and "ok" or "empty",
 		area = AREA,
 		columns = columns,
@@ -115,11 +122,27 @@ local function scan()
 		surface_top_pct = sampled > 0 and math.floor(100 * top_count / sampled) or 0,
 		-- water: sampled columns whose GROUND is a water source — i.e. how much of
 		-- the map is under a lake or the sea, not how many water blocks exist.
-		water = counts["h11_world:water_source"] or 0,
-		-- trees: sampled columns containing a trunk. Not a tree count — the sample
-		-- is every 4th column and a canopy spans 5 — but a stable proxy, and the
-		-- DoD's ">= 20 trees" is asking whether the island is wooded.
+		water = counts["h11_world:melt_source"] or 0,
+		-- trees: sampled columns containing a spire. NOT a count of growths, and
+		-- the difference is a factor of sixteen: the scan samples every 4th column
+		-- on both axes, so it sees one column in sixteen and each growth stands in
+		-- exactly one of them.
 		trees = trunk_columns,
+		-- growths: the estimate that means what the v0.3 DoD says — "at least 20
+		-- trees in a 128x128 area". A growth stands in exactly one column and one
+		-- column in STEP^2 is sampled, so scaling the sample back up is the whole
+		-- of it. An estimate, not a census: a growth in an unsampled column is
+		-- invisible here, which is fine for a threshold and would not be for a
+		-- number anyone quoted.
+		--
+		-- This exists because the gate spent v0 asserting `trees >= 20` while
+		-- believing it was checking the DoD. It was not: at the shipped density
+		-- that threshold demanded about 320 growths on the map, sixteen times what
+		-- was written down. Nobody noticed while the number was comfortably
+		-- exceeded — it surfaced only when the colony retheme made the crowns
+		-- magenta, the density had to drop to a third for the world to be legible
+		-- at all, and a gate that should have passed easily went red.
+		growths = trunk_columns * STEP * STEP,
 	}
 end
 

@@ -54,7 +54,7 @@ tools/deploy_to_term35.sh --setup-key
 tools/deploy_to_term35.sh                 # скопіювати гру + профіль mid і запустити
 tools/deploy_to_term35.sh --profile=high  # low | mid | high
 tools/deploy_to_term35.sh --fresh         # видалити світ на пристрої
-tools/deploy_to_term35.sh --trees=0.004   # рідший ліс (тягне за собою --fresh)
+tools/deploy_to_term35.sh --trees=0.004   # рідші рослини (тягне за собою --fresh)
 tools/deploy_to_term35.sh --no-run        # тільки скопіювати
 tools/deploy_to_term35.sh --stop          # зупинити
 tools/deploy_to_term35.sh --log           # дивитись лог гри
@@ -124,34 +124,38 @@ tools/gpu_preflight.sh
 
 ## Що змінено порівняно зі стоковим Luanti
 
-### Гра — 851 рядок Lua
+### Гра — 961 рядок Lua
 
 [games/h11v/mods/h11_world/](games/h11v/mods/h11_world/):
 
 | файл | що робить |
 |---|---|
-| [nodes.lua](games/h11v/mods/h11_world/nodes.lua) | 9 типів блоків як **таблиця даних** — дерн, земля, камінь, пісок, стовбур, листя, вода, кора H11 |
-| [mapgen.lua](games/h11v/mods/h11_world/mapgen.lua) | параметри генератора v7, один біом, схема дерева, щільність лісу |
-| [player.lua](games/h11v/mods/h11_world/player.lua) | рука-рукавиця, стартовий інвентар, поява на поверхні, привілеї, хотбар |
+| [nodes.lua](games/h11v/mods/h11_world/nodes.lua) | 13 блоків як **таблиця даних**, у двох половинах: планета (реголіт, фракція, літик, нанос, шпиль, цвіт, тала вода, кора H11) і колонія (обшивка, префаб, ящик, маяк) |
+| [mapgen.lua](games/h11v/mods/h11_world/mapgen.lua) | параметри генератора v7, один біом, схема кристалічного шпиля, щільність рослин |
+| [player.lua](games/h11v/mods/h11_world/player.lua) | сканер у руці, стартовий інвентар, поява на поверхні, привілеї, хотбар |
 | [turn.lua](games/h11v/mods/h11_world/turn.lua) | поворот камери на L/R |
 | [music.lua](games/h11v/mods/h11_world/music.lua) | фонова музика по колу |
 
 Блоки, правила й характери ботів живуть **таблицями, а не кодом** — щоб пізніше їх могла
 пропонувати модель. Новий блок — це рядок у `NODES`, а не нова гілка в логіці.
 
-Текстур 22, усі з дизайнерського паку ([specification/art/h11v/](specification/art/h11v/)); процедурної
-генерації текстур немає. Встановлюються однією командою:
+Текстур 40, усі з дизайнерського паку ([specification/art/colony/](specification/art/colony/));
+процедурної генерації текстур немає. Встановлюються однією командою:
 
 ```bash
-tools/install_assets.sh --res=32   # 32×32, авторський розмір (те, що зараз у грі)
-tools/install_assets.sh            # 16×16
+tools/install_assets.sh            # 32×32, авторський розмір (те, що зараз у грі)
+tools/install_assets.sh --res=16   # 16×16
 ```
+
+Напрямок арту — **колонізація іншої планети**, і це свідома заміна словника v0: трава, земля, кора й
+листя — це власний набір матеріалів Minecraft, і перефарбувати його недостатньо. Бриф, правила
+розділення кольорів і аудит доставки — у [ART-COLONY.md](specification/ART-COLONY.md).
 
 ### Налаштування гри
 
 | ключ | типове | що робить |
 |---|---|---|
-| `h11v_tree_density` | `0.032` | щільність лісу; деплой ставить через `--trees=` |
+| `h11v_tree_density` | `0.010` | щільність кристалічних рослин; деплой ставить через `--trees=` |
 | `h11v_music` | `true` | фонова музика |
 | `h11v_music_gain` | `0.5` | гучність |
 | `h11v_button_turn` | `true` | поворот на L/R |

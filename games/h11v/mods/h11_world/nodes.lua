@@ -79,11 +79,27 @@ local NODES = {
 		-- The H11 block: what the algorithm leaves behind. Registered from v0 so
 		-- the catalogue is complete and the art can be judged on the device in
 		-- v0.7, even though nothing places it until v1's mutation cycle.
+		--
+		-- It is also, from v0, the only light in the game. Night on the device was
+		-- reported as "I can't see anything", and 5.10 offers no lever to brighten
+		-- it: there is no light_curve_* family in this build and display_gamma
+		-- measurably does nothing (1.0 and 2.5 render identically). In this engine
+		-- light comes from blocks, so the fix has to be a block.
+		--
+		-- Making it the crust rather than adding a torch is the point. ART.md
+		-- already says H11 leaves "a faint cyan-to-lilac glow" on everything it has
+		-- touched; a torch would be a new object with no art and no place in the
+		-- fiction, while a glowing crust is the fiction. From v1 the mutation front
+		-- will literally light the world as it spreads.
+		--
+		-- 12 of a possible 14: bright enough to work as a lamp, short of the
+		-- daylight ceiling, so a mutated region still reads as glowing rather than
+		-- as lit.
 		id = "crust",
 		description = S("H11 Crust"),
 		tiles = { "h11_crust.png" },
 		groups = { cracky = 2, stone = 1 },
-		light = 3,
+		light = 12,
 	},
 	{
 		-- Source only in v0.2. Its flowing partner is v0.3's row, and the two must

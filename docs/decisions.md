@@ -394,3 +394,49 @@ should not assume the scheme explains itself.
 against the binary's own setting list. Removed rather than kept as forward-compatibility for 5.12: a
 setting that does nothing reads as a setting that does something, and the next person debugging touch
 would start with the one line that cannot possibly be the cause.
+
+### 2026-09-13 — v0.7 answered: the five judgements, from the panel
+
+Answered by Vitalii on the device, which is the only place any of them could be.
+
+| question | answer |
+|---|---|
+| Do 32x32 textures read at 3.5"? | **Yes** — confirmed by building 16x16, looking at both, and reverting |
+| Shimmer on distant blocks? | No difference between the resolutions (measured, not judged) |
+| Does the bright palette hold at night? | **Yes** — deep navy sky with stars, turf still readably green, not a grey wash |
+| Does the H11 glyph read as a symbol? | **Yes**, once it is the right block — and it now glows |
+| Does touch digging and placing work? | **Yes** |
+
+**Three defects surfaced only because someone held the device**, and none of them would have been
+found by any gate:
+
+1. **No privileges.** The game granted none, so the player had the engine's bare `interact, shout`.
+   `/time` refused, and the touch menu's own Fly / Fast / Noclip buttons were dead. The game looked
+   finished while three of its controls did nothing.
+2. **Night was unplayable.** "I can't see anything" — and 5.10 has no lever for it: no
+   `light_curve_*` family in this build, and `display_gamma` measurably does nothing (night captured
+   at 1.0 and 2.5 renders identically). In this engine light comes from blocks, so the fix is a
+   block. See the next entry.
+3. **The engine's own dialogs did not fit the panel**, in two different ways needing two different
+   fixes — see the `font_size` / `gui_scaling` entry.
+
+### 2026-09-13 — The H11 crust is the light, and that is the fiction rather than a workaround
+
+`light_source` 3 → **12** of a possible 14.
+
+**Why a block and not a setting:** 5.10 offers no brightness control that works (above). Light in
+this engine comes from nodes.
+
+**Why the crust and not a torch:** a torch would be a new object with no art in the delivered pack
+and no place in the fiction. [ART.md](../specification/ART.md) already says H11 leaves "a faint
+cyan-to-lilac glow" on everything it has touched — a glowing crust *is* the art direction, not an
+accommodation to it. The player starts with 16.
+
+**A consequence worth having:** from v1, the mutation front will literally light the world as it
+spreads. 12 rather than 14 keeps a mutated region reading as *glowing* rather than merely lit.
+
+### 2026-09-13 — `/time` takes ticks, not clock digits
+
+`[<0..23>:<0..59> | <0..24000>]`. So `/time 1400` is 01:24 in the morning, not two in the afternoon —
+which cost a confused minute on the device. `/time 14:00` is the form to use and the one to put in
+the player guide.

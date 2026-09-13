@@ -31,16 +31,36 @@ local function report(fields)
 	core.log("action", "H11V-WORLDGEN " .. table.concat(parts, " "))
 end
 
---- Walk down from the sky to the first non-air node: that is the surface.
-local function surface_at(area, data, x, z)
+-- Nodes that sit ON the ground rather than being it. Walking down from the sky
+-- and stopping at the first solid node finds a tree canopy, not the ground, and
+-- then reports the world as 22% leaves — which says nothing about the terrain the
+-- DoD is asking about. So the ground scan steps through them, and trees are
+-- counted separately, by their trunks.
+--
+-- The definition matters more than it looks: `surface_top` means THE GROUND, and
+-- a later change that lets a canopy back into that number would silently alter
+-- what every assertion in the gate is asserting.
+local ABOVE_GROUND = {
+	["h11_world:leaves"] = true,
+	["h11_world:trunk"] = true,
+}
+
+--- Walk down from the sky to the first ground node, stepping past anything
+--- growing on it. Returns the ground y and id, plus whether a trunk was passed.
+local function surface_at(area, data, names, x, z)
+	local had_trunk = false
 	for y = Y_MAX, Y_MIN, -1 do
 		local vi = area:index(x, y, z)
 		local id = data[vi]
 		if id ~= core.CONTENT_AIR and id ~= core.CONTENT_IGNORE then
-			return y, id
+			local name = names[id]
+			if name == "h11_world:trunk" then had_trunk = true end
+			if not (name and ABOVE_GROUND[name]) then
+				return y, id, had_trunk
+			end
 		end
 	end
-	return nil, nil
+	return nil, nil, had_trunk
 end
 
 local function scan()
@@ -56,7 +76,7 @@ local function scan()
 
 	local counts = {}
 	local surface_min, surface_max
-	local columns, sampled = 0, 0
+	local columns, sampled, trunk_columns = 0, 0, 0
 
 	-- Sample every 4th column: 32x32 = 1024 probes over a 128x128 area is ample
 	-- for an elevation range and a surface histogram, and keeps the gate fast
@@ -64,7 +84,8 @@ local function scan()
 	for x = pmin.x, pmax.x, 4 do
 		for z = pmin.z, pmax.z, 4 do
 			columns = columns + 1
-			local y, id = surface_at(area, data, x, z)
+			local y, id, had_trunk = surface_at(area, data, names, x, z)
+			if had_trunk then trunk_columns = trunk_columns + 1 end
 			if y then
 				sampled = sampled + 1
 				local name = names[id] or ("id:" .. tostring(id))
@@ -92,9 +113,13 @@ local function scan()
 		elevation_range = (surface_min and surface_max) and (surface_max - surface_min) or -1,
 		surface_top = top_name,
 		surface_top_pct = sampled > 0 and math.floor(100 * top_count / sampled) or 0,
-		-- Placeholders until v0.3 registers water's flowing partner and the trees.
+		-- water: sampled columns whose GROUND is a water source — i.e. how much of
+		-- the map is under a lake or the sea, not how many water blocks exist.
 		water = counts["h11_world:water_source"] or 0,
-		trees = counts["h11_world:trunk"] or 0,
+		-- trees: sampled columns containing a trunk. Not a tree count — the sample
+		-- is every 4th column and a canopy spans 5 — but a stable proxy, and the
+		-- DoD's ">= 20 trees" is asking whether the island is wooded.
+		trees = trunk_columns,
 	}
 end
 

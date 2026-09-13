@@ -126,4 +126,85 @@ core.set_mapgen_setting_noiseparams("mgv7_np_terrain_base", {
 	lacunarity = 2.0,
 }, true)
 
+--- Trees.
+--
+-- A schematic handed to the engine, not an ABM and not an on_generated loop:
+-- decorations are placed once, with the chunk, by the mapgen thread. Nothing
+-- about a tree costs anything per tick afterwards, which is the whole point on a
+-- device whose frame budget v0.7 is about to measure.
+--
+-- No leafdecay either. That is a per-tick ABM over every leaf in view, and v0
+-- exists to learn what the device does with the simple case first.
+
+local _ = "air"      -- readability in the layer tables below
+local T = "h11_world:trunk"
+local L = "h11_world:leaves"
+
+-- Probabilities: 255 is always, 0 is never. The corners of the canopy are given
+-- middling odds so that no two trees are quite the same shape — a forest of
+-- identical stamps reads as wallpaper.
+local SOMETIMES = 160
+
+local tree = {
+	size = { x = 5, y = 7, z = 5 },
+	yslice_prob = {},
+	data = {},
+}
+
+-- Layers are built bottom-to-top, and within a layer row-by-row on z then x,
+-- which is the order the engine reads `data`.
+local layers = {
+	-- y = 0..2: the trunk alone
+	{ pattern = "trunk" }, { pattern = "trunk" }, { pattern = "trunk" },
+	-- y = 3..4: the wide canopy, trunk still running through it
+	{ pattern = "wide" }, { pattern = "wide" },
+	-- y = 5: narrower
+	{ pattern = "narrow" },
+	-- y = 6: the cap
+	{ pattern = "cap" },
+}
+
+for _y, layer in ipairs(layers) do
+	for z = 1, 5 do
+		for x = 1, 5 do
+			local centre = (x == 3 and z == 3)
+			local inner = (math.abs(x - 3) <= 1 and math.abs(z - 3) <= 1)
+			local corner = (math.abs(x - 3) == 2 and math.abs(z - 3) == 2)
+			local node, prob = _, 255
+
+			if layer.pattern == "trunk" then
+				node = centre and T or _
+			elseif layer.pattern == "wide" then
+				if centre then node = T
+				elseif corner then node, prob = L, SOMETIMES
+				else node = L end
+			elseif layer.pattern == "narrow" then
+				if inner then node = L
+				elseif not corner then node, prob = L, SOMETIMES end
+			elseif layer.pattern == "cap" then
+				if centre then node = L
+				elseif inner and not corner then node, prob = L, SOMETIMES end
+			end
+
+			tree.data[#tree.data + 1] = { name = node, prob = prob, param2 = 0 }
+		end
+	end
+end
+
+core.register_decoration({
+	name = "h11_world:tree",
+	deco_type = "schematic",
+	place_on = { "h11_world:turf" },
+	sidelen = 16,
+	-- Tuned for a wooded island rather than a forest or a lawn: dense enough that
+	-- the 128x128 map clears the DoD's 20 trees with room to spare, sparse enough
+	-- that the player can see across it.
+	fill_ratio = 0.012,
+	y_max = 200,
+	y_min = 7,          -- above the water line: no trees standing in the sea
+	schematic = tree,
+	flags = "place_center_x, place_center_z",
+	rotation = "random",
+})
+
 core.log("action", "[h11_world] mapgen wired: v7, one technical biome, 3 structural aliases")

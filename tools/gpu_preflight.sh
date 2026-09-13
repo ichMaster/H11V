@@ -30,13 +30,21 @@ esac
 die() { echo "error: $*" >&2; exit 1; }
 
 # The probe itself, run either here or there.
+# Probe the path the GAME takes, not a path that happens to work. The device's
+# engine is the legacy Irrlicht X11 build and renders through GLX on XWayland, so
+# GLX is what must be verified — an earlier version of this script asked EGL,
+# which answered V3D correctly while telling us nothing about the renderer the
+# game would actually get. EGL is kept as a secondary reading.
 PROBE='
 echo "LIBGL_ALWAYS_SOFTWARE=[${LIBGL_ALWAYS_SOFTWARE:-unset}]"
+if command -v glxinfo >/dev/null 2>&1; then
+	DISPLAY="${DISPLAY:-:0}" glxinfo -B 2>/dev/null \
+		| grep -iE "OpenGL renderer|direct rendering" | head -2
+fi
 if command -v eglinfo >/dev/null 2>&1; then
-	eglinfo 2>/dev/null | grep -iE "OpenGL ES profile renderer" | head -1
-elif command -v glxinfo >/dev/null 2>&1; then
-	glxinfo -B 2>/dev/null | grep -i "OpenGL renderer" | head -1
-else
+	eglinfo 2>/dev/null | grep -iE "OpenGL ES profile renderer" | head -1 | sed "s/^/(egl) /"
+fi
+if ! command -v glxinfo >/dev/null 2>&1 && ! command -v eglinfo >/dev/null 2>&1; then
 	echo "NO-PROBE: install mesa-utils"
 fi
 '
@@ -61,7 +69,9 @@ fi
 echo "== GPU preflight: $WHERE =="
 echo "$OUT" | sed 's/^/   /'
 
-RENDERER="$(echo "$OUT" | grep -i "renderer" | head -1)"
+# The GLX line first: it is the one the game's renderer will be.
+RENDERER="$(echo "$OUT" | grep -i "OpenGL renderer" | head -1)"
+[ -n "$RENDERER" ] || RENDERER="$(echo "$OUT" | grep -i "renderer" | head -1)"
 
 if echo "$OUT" | grep -q "NO-PROBE"; then
 	die "no eglinfo or glxinfo on the target — install mesa-utils and run this again"

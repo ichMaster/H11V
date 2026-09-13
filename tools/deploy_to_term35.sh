@@ -131,8 +131,21 @@ PGREP='pgrep -x luanti >/dev/null || pgrep -x minetest >/dev/null'
 # --- one-off actions ---------------------------------------------------------
 
 if [ "$stop_only" = 1 ]; then
-	"${SSH[@]}" "$TARGET" "$PKILL"
-	echo "==> stopped"
+	# Wait for it to actually be gone before saying so. pkill returns as soon as
+	# the signal is delivered, and the game takes a moment to exit — so a bare
+	# "==> stopped" is a claim about a signal, not about the device. Anything
+	# scripted after a stop (a redeploy, a measurement) would race it.
+	"${SSH[@]}" "$TARGET" "
+		$PKILL
+		for _ in 1 2 3 4 5 6 7 8 9 10; do
+			pgrep -x luanti >/dev/null 2>&1 || pgrep -x minetest >/dev/null 2>&1 || exit 0
+			sleep 0.5
+		done
+		pkill -9 -x luanti 2>/dev/null; pkill -9 -x minetest 2>/dev/null
+		sleep 0.5
+		pgrep -x luanti >/dev/null 2>&1 && exit 1
+		exit 0
+	" && echo "==> stopped" || { echo "==> still running after SIGKILL" >&2; exit 1; }
 	exit 0
 fi
 

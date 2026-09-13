@@ -7,10 +7,17 @@ if [ -z "${WAYLAND_DISPLAY:-}" ]; then
   export WAYLAND_DISPLAY="$(ls "$XDG_RUNTIME_DIR" | grep -m1 '^wayland-[0-9]*$')"
 fi
 
-# Luanti renders through SDL; on this device that must be the Wayland backend
-# talking to EGL/V3D. Left to its own devices SDL can pick X11-on-Xwayland and
-# quietly land on llvmpipe, which draws correctly and makes every fps number a
-# lie. See specification/ARCHITECTURE.md, "The GPU path".
+# This device's Luanti is the legacy Irrlicht X11 build — libX11, no SDL, no EGL,
+# no GLESv2 — so it renders through GLX on XWayland rather than natively on
+# Wayland. That still reaches the hardware (DISPLAY=:0 glxinfo reports V3D 7.1.7.0,
+# direct rendering yes); it is simply not the path the specification originally
+# assumed. See docs/decisions.md.
+#
+# DISPLAY must be set explicitly: over ssh there is none, and without it the
+# engine dies with "Need running XServer" — which reads like a broken desktop and
+# is a missing environment variable.
+export DISPLAY="${DISPLAY:-:0}"
+# Harmless if a future build is the SDL one; ignored by this one.
 export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-wayland}"
 
 # The desktop runs the panel at scale 1.25 (an effective 512x384) so terminal
@@ -82,14 +89,43 @@ mkdir -p "$USER_DIR/games"
 rm -rf "$USER_DIR/games/h11v"
 ln -s "$PWD/game" "$USER_DIR/games/h11v"
 
-# Prove the engine can see it before launching. Without this the failure surfaces
+# Prove the engine can see it before launching. Both streams are captured on
+# purpose: 5.10 prints the game list to stderr and 5.17 to stdout, and a check
+# that reads only one of them is a guard that blocks working deploys — which is
+# its own defect, and worse than no guard, because it is believed. Without this the failure surfaces
 # later and elsewhere -- the deploy script reports "the game did not stay up" for
 # a game that copied perfectly and simply could not be resolved.
-if ! "$LUANTI" --gameid list 2>/dev/null | grep -qx 'h11v'; then
+if ! "$LUANTI" --gameid list 2>&1 | grep -qx 'h11v'; then
   echo "error: the engine cannot see the h11v game." >&2
   echo "       linked $PWD/game -> $USER_DIR/games/h11v, but --gameid list does not list it." >&2
   echo "       Check the link target exists and game.conf is readable." >&2
   exit 1
+fi
+
+# The world has to exist before --go will use it: the engine creates a world from
+# the main menu, not from the command line, and with --go it simply refuses. So
+# the deploy owns world creation — one world.mt naming our gameid is all it takes,
+# and the engine generates the map into it on first run.
+# Start each run's engine log fresh. Luanti appends, and the deploy's renderer
+# check greps the FIRST match — so a stale line from a failed launch three
+# deploys ago would be reported as this run's renderer, forever. A log that
+# describes a run other than the current one is worse than no log.
+: > "$PWD/h11v-debug.txt"
+
+WORLD_DIR="$USER_DIR/worlds/h11v_dev"
+if [ ! -f "$WORLD_DIR/world.mt" ]; then
+  mkdir -p "$WORLD_DIR"
+  cat > "$WORLD_DIR/world.mt" <<'WORLDMT'
+gameid = h11v
+backend = sqlite3
+player_backend = sqlite3
+auth_backend = sqlite3
+mod_storage_backend = sqlite3
+world_name = h11v_dev
+creative_mode = true
+enable_damage = false
+WORLDMT
+  echo "==> created world h11v_dev"
 fi
 
 # Not exec: the trap above has to run when the game exits.

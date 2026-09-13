@@ -457,7 +457,7 @@ confirmed here against the input device list:
 
 ```
 A 30 · B 48 · X 45 · Y 21 · L 38 · R 19    each sends the letter on its own face
-Select 99 = SysRq (KEY_SNAPSHOT)   Start 119 = Pause (KEY_PAUSE)
+Select 99 = SysRq (KEY_PRINT, not KEY_SNAPSHOT — see v0.7.2)   Start 119 = Pause (KEY_PAUSE)
 D-pad 103/108/105/106 = the arrow keys
 ```
 
@@ -544,3 +544,43 @@ is nothing to revoke, and Luanti has no client-side API that would let a mod sup
 
 The escape hatch, if it ever stops being acceptable: drop turning from L and keep it only on R, whose
 `aux1` transport is genuinely inert and flashes not at all.
+
+## v0.7.2 — Turning, and the hotbar on Select
+
+### 2026-09-13 — Select cycles the hotbar: two wrong answers before the key even reached the game
+
+Select's final job is `hotbar_next`, cycling slots 1→8→1. L/R gave up hotbar duty when they took over
+turning, and Start stays on chat. Getting one button to do one thing took three separate corrections,
+and only the last of them was in this repository at all.
+
+**1. `hotbar_previous` had to be actively emptied.** Luanti's default for it is `KEY_KEY_B` — the same
+B that is sneak here. Dropping the binding is not the same as unbinding it: the default reappears. So
+`tools/device/gamepad.conf` carries `keymap_hotbar_previous =` with nothing after the `=`. Cycling in
+one direction only is also the better behaviour on a single button: eight slots, one key, wraps round.
+Verified on the device — the eighth press returns to the starting slot, the ninth moves on.
+
+**2. The engine's name for the key is `KEY_PRINT`, not `KEY_SNAPSHOT`.** The physical Select sends
+evdev code **99 = `KEY_SYSRQ`**, which xkb maps to the keysym `Print`; Irrlicht calls that `KEY_PRINT`.
+`KEY_SNAPSHOT` is accepted by the config parser without complaint and simply never fires. Measured
+three ways on the device, restarting between each, by counting changed pixels in the hotbar strip:
+
+```
+KEY_SNAPSHOT + injected Print  ->  no change
+KEY_PRINT    + injected Print  ->  the hotbar advances
+```
+
+**3. Sway was eating the key, and editing its config did nothing.** `bindsym Print exec grim` sat at
+line 119 of `~/.config/sway/config` and took the key before any client saw it. The evidence was
+sitting in `$HOME`: **106 stray screenshots**, one per press, accumulating while the button "did
+nothing". Moved to `$mod+Print`, with a backup at `~/.config/sway/config.bak-h11v`.
+
+The part worth remembering is what came next. After the edit the button still failed, because **Sway
+does not reload its configuration when the file changes** — and `swaymsg -t get_config` returns the
+config *as loaded*, not the file on disk, so the two disagreed while looking like the same thing. The
+old `bindsym Print` was still live and still counting up screenshots. `swaymsg reload` is the step, and
+`get_config` is the way to confirm it actually happened.
+
+**A compositor binding is invisible from inside the game.** Nothing reaches the engine, so nothing
+appears in `debug.txt`, and the natural conclusion — the wrong key name — was wrong twice over. When a
+key does nothing on this device, ask the compositor what it has claimed before touching the game's
+keymap. The current claims: `$mod`-prefixed bindings, and `$mod+Print`.

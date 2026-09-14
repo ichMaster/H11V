@@ -13,8 +13,8 @@
 #                                             every deploy runs without a password)
 #
 # Connection details are read at run time from .term35-connect.txt in the repo
-# root ("ip:", "user:", "psswd:", one per line). That file is gitignored on
-# purpose: nothing here hardcodes, echoes or logs the password.
+# root ("ip:", "user:", "psswd:", one per line). That file is gitignored on purpose,
+# and the password is never hardcoded, echoed, logged, or put in any process's argv.
 #
 # Unlike the Godot sibling project there is no binary to export: Luanti is
 # installed on the device as a package and H11V is content. What ships is the
@@ -72,6 +72,28 @@ TARGET="$DEV_USER@$IP"
 
 SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=8)
 
+# When a password is unavoidable it reaches sshpass through the environment, with
+# `sshpass -e`, and never through its `-p <password>` flag, which puts the password
+# into a command line. (Spelled that way so a grep for the forbidden form finds no
+# hits at all, including this explanation of it.)
+#
+# rsync is why that distinction is a security defect and not a matter of taste:
+# RSYNC_RSH is handed to rsync as its own `-e` argument, and rsync does not mask its
+# argv — so for the whole multi-second transfer `ps aux` on this Mac showed the
+# device password in clear text to every other account on the machine (v0.8 review
+# H1; the bare ssh/scp/ssh-copy-id calls leaked the same value for the shorter life
+# of each process). `-e` also removes a second, quieter defect in the same line: the
+# password was interpolated *unquoted* into that string, and rsync word-splits `-e`
+# itself, so a password containing a space was silently truncated and its remainder
+# became a remote command word — an auth failure with no plausible cause.
+#
+# Do not "simplify" this back to -p. And note what holds it: SSHPASS has exactly one
+# assignment in this file and is never echoed, never logged, and never traced —
+# there is no `set -x` here and there must not be one.
+sshpass_from_env() {
+	export SSHPASS="$DEV_PASS"
+}
+
 key_auth_works() {
 	ssh -o BatchMode=yes "${SSH_OPTS[@]}" "$TARGET" true 2>/dev/null
 }
@@ -97,7 +119,8 @@ if [ "$setup_key" = 1 ]; then
 	}
 	echo "==> installing your public key on $TARGET"
 	if command -v sshpass >/dev/null 2>&1 && [ -n "$DEV_PASS" ]; then
-		sshpass -p "$DEV_PASS" ssh-copy-id "${SSH_OPTS[@]}" "$TARGET"
+		sshpass_from_env
+		sshpass -e ssh-copy-id "${SSH_OPTS[@]}" "$TARGET"
 	else
 		echo "    (the password is the 'psswd:' line in $CONN_FILE)"
 		ssh-copy-id "${SSH_OPTS[@]}" "$TARGET"
@@ -113,10 +136,15 @@ SCP=(scp "${SSH_OPTS[@]}")
 if key_auth_works; then
 	:
 elif command -v sshpass >/dev/null 2>&1 && [ -n "$DEV_PASS" ]; then
-	# Password from the credentials file; never printed, never in the argv of ssh.
-	SSH=(sshpass -p "$DEV_PASS" "${SSH[@]}")
-	SCP=(sshpass -p "$DEV_PASS" "${SCP[@]}")
-	RSYNC_RSH="sshpass -p $DEV_PASS $RSYNC_RSH"
+	# Password from the credentials file, handed over in the environment - see
+	# sshpass_from_env above for why it is -e and must stay -e. RSYNC_RSH stays a
+	# single string because rsync tokenizes `-e` on whitespace itself; every token
+	# in it is space-free by construction, which is exactly what the old form could
+	# not promise once the password was inside it.
+	sshpass_from_env
+	SSH=(sshpass -e "${SSH[@]}")
+	SCP=(sshpass -e "${SCP[@]}")
+	RSYNC_RSH="sshpass -e $RSYNC_RSH"
 else
 	cat >&2 <<EOF
 error: cannot log in to $TARGET without typing a password every time.
@@ -141,16 +169,26 @@ if [ "$stop_only" = 1 ]; then
 	# the signal is delivered, and the game takes a moment to exit — so a bare
 	# "==> stopped" is a claim about a signal, not about the device. Anything
 	# scripted after a stop (a redeploy, a measurement) would race it.
+	#
+	# Both probes now use $PGREP, which asks about both process names. The one after
+	# the SIGKILL asked about "luanti" alone, so a stuck pre-rename "minetest" binary
+	# — the very case the kill above it handles — made this print "==> stopped" and
+	# exit 0 with the engine still running, handing the false all-clear to whatever
+	# was scripted next (v0.8 review L13). It also polls to a deadline instead of
+	# sleeping 0.5 s once: SIGKILL is immediate, reaping a process blocked in
+	# uninterruptible I/O is not.
 	"${SSH[@]}" "$TARGET" "
 		$PKILL
 		for _ in 1 2 3 4 5 6 7 8 9 10; do
-			pgrep -x luanti >/dev/null 2>&1 || pgrep -x minetest >/dev/null 2>&1 || exit 0
+			$PGREP || exit 0
 			sleep 0.5
 		done
 		pkill -9 -x luanti 2>/dev/null; pkill -9 -x minetest 2>/dev/null
-		sleep 0.5
-		pgrep -x luanti >/dev/null 2>&1 && exit 1
-		exit 0
+		for _ in 1 2 3 4 5 6; do
+			$PGREP || exit 0
+			sleep 0.5
+		done
+		exit 1
 	" && echo "==> stopped" || { echo "==> still running after SIGKILL" >&2; exit 1; }
 	exit 0
 fi
@@ -174,7 +212,11 @@ Install it there first (apt install luanti), then deploy."
 
 # Base plus the profile's deltas, in that order, so a later key wins. Built here
 # rather than on the device: the device gets one file and no logic.
-CONF_TMP="$(mktemp -t h11v-conf)"
+# `mktemp -t PREFIX` is a BSD-ism: GNU mktemp reads -t as the deprecated "template
+# in $TMPDIR" flag and refuses a template with no XXXXXX, so this line aborted the
+# deploy on any GNU box (v0.8 review L17 — the same Mac-ism the worldgen gate hit at
+# M13). The explicit template works on both.
+CONF_TMP="$(mktemp "${TMPDIR:-/tmp}/h11v-conf.XXXXXX")"
 trap 'rm -f "$CONF_TMP"' EXIT
 {
 	echo "# Generated by tools/deploy_to_term35.sh - do not edit on the device."
@@ -238,15 +280,33 @@ fi
 # old process is still dying gets its new config overwritten by the old one's
 # memory — silently, and with the comments preserved so it looks like it worked.
 # That cost an afternoon: a whole keymap block arrived as comments with every
-# setting stripped out. Same lesson as --stop, which learned it first.
+# setting stripped out. Same lesson as --stop, which learned it first — and only
+# half-learned here, because this path signalled, slept 0.5 s and then swapped
+# unconditionally. On a slow SD card an engine blocked in uninterruptible I/O can
+# outlive that grace period and complete its write-back AFTER the swap, which is
+# precisely the clobber the wait exists to prevent (v0.8 review M7; docs/decisions.md,
+# 2026-09-13, "A deploy must wait for the engine to exit, not just signal it").
+#
+# So the SIGKILL is verified the way --stop verifies it, and a survivor stops the
+# deploy here, before the mv. A deploy that refuses is recoverable by running it
+# again; a config overwritten by a dying engine looks deployed and is not.
 "${SSH[@]}" "$TARGET" "
 	$PKILL
 	for _ in 1 2 3 4 5 6 7 8 9 10; do
-		pgrep -x luanti >/dev/null 2>&1 || pgrep -x minetest >/dev/null 2>&1 || break
+		$PGREP || exit 0
 		sleep 0.5
 	done
-	pkill -9 -x luanti 2>/dev/null; pkill -9 -x minetest 2>/dev/null; true
-	sleep 0.5"
+	pkill -9 -x luanti 2>/dev/null; pkill -9 -x minetest 2>/dev/null
+	for _ in 1 2 3 4 5 6; do
+		$PGREP || exit 0
+		sleep 0.5
+	done
+	exit 1" || die "the engine on $TARGET survived the SIGKILL, so nothing was swapped.
+Luanti writes its settings back to the config file as it shuts down, so swapping now
+would let the dying process overwrite this deploy silently. Everything staged is
+still safe in ~/$REMOTE_DIR/*.incoming.
+Find out what is holding it (ps, and dmesg for SD-card I/O errors), then run this
+deploy again - it will re-stage and swap."
 "${SSH[@]}" "$TARGET" "
 	set -e
 	cd ~/$REMOTE_DIR
@@ -301,19 +361,53 @@ fi
 
 # The GPU preflight from specification/ARCHITECTURE.md: an llvmpipe fallback
 # renders correctly and makes every fps number fiction, so it must be loud.
-# tools/gpu_preflight.sh is the authoritative probe; this is the post-launch
-# confirmation from the engine's own log, which is the renderer actually used.
-# h11v-debug.txt is the engine log run_on_pi.sh writes with --logfile; h11v.log is
-# only that script's stdout and carries no renderer line. The other two are
-# fallbacks for a device someone configured by hand.
-RENDERER="$("${SSH[@]}" "$TARGET" "grep -ihm1 -e 'renderer' ~/$REMOTE_DIR/h11v-debug.txt ~/$REMOTE_DIR/h11v.log ~/.minetest/debug.txt ~/.luanti/debug.txt 2>/dev/null" || true)"
-if [ -n "$RENDERER" ]; then
-	echo "==> renderer: $RENDERER"
-	case "$RENDERER" in
-		*llvmpipe*|*softpipe*|*swrast*)
-			echo "WARNING: software rasterizer in use - fps measurements from this run are void." >&2
-			echo "         Fix EGL/V3D on the device before measuring (ARCHITECTURE.md, GPU path)." >&2 ;;
-	esac
-fi
+# tools/gpu_preflight.sh is the authoritative probe, but it asks glxinfo — a
+# different process; this is the confirmation from the engine's own log, which is
+# the renderer the ENGINE was given.
+#
+# Three things about the shape of this, all of them repairs to a block that could
+# not fire (v0.8 review M4):
+#
+#  * It greps for the GPU name itself — llvmpipe/softpipe/swrast, or V3D — not for
+#    the word "renderer". The line that carries it is the Irrlicht driver-init dump,
+#    whose wording belongs to the engine and is not ours to depend on.
+#  * It needs debug_log_level = info, which tools/device/minetest.conf now sets. At
+#    the engine's default level the log holds no driver lines at all, so the grep
+#    matched nothing on every run and skipped in silence — while the comment above it
+#    told the reader the renderer actually used had been confirmed. That is the worst
+#    of the three states: no evidence, presented as evidence.
+#  * One log, not four. h11v-debug.txt is the --logfile run_on_pi.sh truncates at
+#    every launch, so it describes THIS run. ~/.minetest/debug.txt and
+#    ~/.luanti/debug.txt were also searched and are appended to forever, so a line
+#    from a launch three deploys ago could be reported as today's renderer; h11v.log
+#    is only run_on_pi.sh's stdout, and the console stream stays at action level.
+#
+# Polled rather than read once: pgrep has proved the engine is alive, but on a slow
+# SD card the driver may still be initialising, and an empty grep one second too
+# early is indistinguishable from a renderer that never logged.
+GPU_EVIDENCE="$("${SSH[@]}" "$TARGET" "
+	for _ in 1 2 3 4 5 6 7 8 9 10; do
+		hit=\$(grep -ihE -m1 'llvmpipe|softpipe|swrast|v3d' ~/$REMOTE_DIR/h11v-debug.txt 2>/dev/null)
+		[ -n \"\$hit\" ] && { printf '%s\n' \"\$hit\"; exit 0; }
+		sleep 1
+	done" 2>/dev/null || true)"
+# Matched case-insensitively above, so fold the answer before classifying it.
+case "$(printf '%s' "$GPU_EVIDENCE" | tr '[:upper:]' '[:lower:]')" in
+	*llvmpipe*|*softpipe*|*swrast*)
+		echo "==> renderer (engine log): $GPU_EVIDENCE"
+		echo "WARNING: software rasterizer in use - fps measurements from this run are void." >&2
+		echo "         Fix GLX/V3D on the device before measuring (ARCHITECTURE.md, GPU path)" >&2
+		echo "         and re-run tools/gpu_preflight.sh." >&2 ;;
+	*v3d*)
+		echo "==> renderer (engine log): $GPU_EVIDENCE" ;;
+	*)
+		# Loud, because the alternative is the defect this block was just repaired
+		# from: a missing check that reads as a passed one.
+		echo "NOTE: the engine log named no renderer, so this deploy has confirmed nothing." >&2
+		echo "      Expected a driver line naming V3D in ~/$REMOTE_DIR/h11v-debug.txt." >&2
+		echo "      Check that debug_log_level = info reached ~/$REMOTE_DIR/minetest.conf;" >&2
+		echo "      until it does, treat the renderer as unverified and trust only" >&2
+		echo "      tools/gpu_preflight.sh." >&2 ;;
+esac
 
 echo "==> done.  logs: tools/deploy_to_term35.sh --log   stop: tools/deploy_to_term35.sh --stop"

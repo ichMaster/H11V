@@ -39,8 +39,20 @@ done
 
 die() { echo "error: $*" >&2; exit 1; }
 [ -f "$CONN_FILE" ] || die "no credentials file at $CONN_FILE"
-cfg_get() { sed -n "s/^[[:space:]]*$1[[:space:]]*:[[:space:]]*//p" "$CONN_FILE" | head -1 | tr -d '\r'; }
-IP="$(cfg_get ip)"; DEV_USER="$(cfg_get user)"; TARGET="$DEV_USER@$IP"
+# Verbatim from tools/deploy_to_term35.sh, including the trailing-whitespace strip
+# this copy was missing (v0.8 review L16). One trailing space on the "ip:" line made
+# TARGET "user@1.2.3.4 ", which ssh splits into a host plus a remote command — the
+# run then died more than twenty seconds later with a message about grim, and the
+# file that was actually wrong was never mentioned.
+cfg_get() {
+	sed -n "s/^[[:space:]]*$1[[:space:]]*:[[:space:]]*//p" "$CONN_FILE" | head -1 | tr -d '\r' | sed 's/[[:space:]]*$//'
+}
+IP="$(cfg_get ip)"; DEV_USER="$(cfg_get user)"
+# Checked here, where the message can name the file, instead of surfacing as the
+# first ssh call failing for a reason of its own.
+[ -n "$IP" ] || die "no usable 'ip:' line in $CONN_FILE (expected: ip: 192.168.1.105)"
+[ -n "$DEV_USER" ] || die "no usable 'user:' line in $CONN_FILE (expected: user: ich)"
+TARGET="$DEV_USER@$IP"
 SSH=(ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new)
 
 # The environment a Wayland tool needs when it is invoked over ssh rather than
@@ -68,8 +80,38 @@ for profile in $PROFILES; do
 	# So each profile is measured at its own shipping cap, and the number that
 	# carries the information is `drawtime`: the real per-frame render cost, which
 	# no cap or range-steering touches.
-	"$ROOT/tools/deploy_to_term35.sh" --profile="$profile" --fresh >/dev/null 2>&1 \
-		|| die "deploy failed for profile $profile"
+	#
+	# The deploy's output is captured, not discarded. This is the one run whose
+	# numbers reach docs/decisions.md, and the deploy's post-launch check is the only
+	# reading in the chain that comes from the ENGINE's own log — sending both streams
+	# to /dev/null silenced precisely the warning that would void the measurement
+	# (v0.8 review M6). On any failure the log is printed and its path named.
+	DEPLOY_LOG="$(mktemp "${TMPDIR:-/tmp}/h11v-deploy-$profile.XXXXXX")"
+	"$ROOT/tools/deploy_to_term35.sh" --profile="$profile" --fresh >"$DEPLOY_LOG" 2>&1 \
+		|| { sed 's/^/   | /' "$DEPLOY_LOG" >&2
+		     die "deploy failed for profile $profile (output above, kept in $DEPLOY_LOG)"; }
+	# And the warning aborts this profile, the way a failed preflight aborts the run:
+	# a measurement on a software rasterizer is not a weaker measurement, it is a
+	# false one, and a false one recorded is worse than a profile left unmeasured.
+	# The pattern matches both halves of the evidence: the GPU name the engine logged
+	# and the deploy's own warning wording, so the abort does not depend on Mesa
+	# spelling its software driver one of three ways.
+	if grep -qiE 'llvmpipe|softpipe|swrast|software rasterizer' "$DEPLOY_LOG"; then
+		sed 's/^/   | /' "$DEPLOY_LOG" >&2
+		die "the deploy reported a software rasterizer for profile $profile - nothing
+measured now is worth recording. Fix GLX/V3D on the device (tools/gpu_preflight.sh,
+specification/ARCHITECTURE.md 'The GPU path'); the deploy output is in $DEPLOY_LOG."
+	fi
+	# The deploy's own renderer line, carried down to the screenshot it belongs to
+	# rather than re-probed: this is what the engine reported during THIS profile. The
+	# deploy's NOTE matches too, which is the point — "no evidence" has to be as
+	# visible beside a capture as a renderer name is. The seds strip only the deploy's
+	# decoration; if its wording ever changes, the whole line is printed instead,
+	# which is still the truth.
+	PROFILE_RENDERER="$(grep -i -m1 'renderer' "$DEPLOY_LOG" \
+		| sed -e 's/^==> *//' -e 's/^renderer (engine log): *//')"
+	[ -n "$PROFILE_RENDERER" ] || PROFILE_RENDERER="unconfirmed - the deploy said nothing about the renderer"
+	rm -f "$DEPLOY_LOG"
 
 	echo "   settling ${SETTLE}s (world generation, first chunks)"
 	sleep "$SETTLE"
@@ -107,8 +149,19 @@ for profile in $PROFILES; do
 		|| die "could not fetch the screenshot for $profile"
 	wait "$WALK_PID" 2>/dev/null
 
-	ERRORS="$("${SSH[@]}" "$TARGET" 'grep -c "ERROR" ~/h11v/h11v-debug.txt' 2>/dev/null || echo "?")"
+	# grep -c prints 0 and EXITS 1 when there is nothing to count, so the old
+	# `|| echo "?"` fired on every clean run and appended a second word: the best
+	# outcome available printed as "0 ?" and read as the could-not-read case (v0.8
+	# review L15). The two states are now separated at the source — the remote side
+	# says whether the log could be READ, and the count is only ever a number.
+	ERRORS="$("${SSH[@]}" "$TARGET" "
+		[ -r ~/$REMOTE_DIR_REMOTE/h11v-debug.txt ] || { echo unreadable; exit 0; }
+		grep -c ERROR ~/$REMOTE_DIR_REMOTE/h11v-debug.txt || true" 2>/dev/null)"
+	case "$ERRORS" in
+		''|*[!0-9]*) ERRORS="? - could not read ~/$REMOTE_DIR_REMOTE/h11v-debug.txt" ;;
+	esac
 	echo "   captured $SHOT   (engine errors this run: $ERRORS)"
+	echo "   renderer this profile: $PROFILE_RENDERER"
 done
 
 "$ROOT/tools/deploy_to_term35.sh" --stop >/dev/null 2>&1

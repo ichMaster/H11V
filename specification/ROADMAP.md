@@ -239,9 +239,17 @@ table.
    the repository root; the `docs/device/` screenshots marked as the pre-retheme record they are.
 
 **DoD:** every HIGH and MEDIUM in the review's table is either fixed or explicitly re-classified as
-deferred **in that document**, with the reason; the review document carries a Status per finding; all
-five acceptance gates green; `tools/check_assets.py --pack` audits the colony delivery; no
-specification document contradicts the shipped code on a load-bearing detail.
+deferred **in that document**, with the reason; the review document carries a Status per finding;
+`tools/check_assets.py --pack` audits the colony delivery; no specification document contradicts the
+shipped code on a load-bearing detail.
+
+**Four gates, not five.** The device was in use throughout this phase, so no issue ran a deploy and
+the frame-rate gate is deferred to a single device pass before the release rather than claimed. Three
+things wait for it: the deploy's new `sshpass -e` path and its renderer grep end to end; whether the
+v0.7 fps numbers still hold now that `debug_log_level = info` adds SD-card I/O during generation; and
+the spawn fix, the zoom-button residue and the terrain outside the old measured window, seen. Saying
+four is the point — a DoD that claims a gate nobody ran is the failure mode this whole phase existed
+to fix.
 
 **Tests:** the existing gates, plus what this phase adds to them — `check_assets.py` must reject a
 flattened RGB re-export of a binary-alpha texture and an out-of-band node resolution; `check_lua.sh`

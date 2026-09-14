@@ -1004,3 +1004,15 @@ is the actual finding: v0.9 itself added the rule that a finding recorded outsid
 `specification/implementation/*code-review*.md` "is a note, not a work item", and then wrote this one
 into exactly such a place and closed the work item. **It blocks nothing in the game and everything in
 a redistribution.**
+
+### 2026-09-14 — The music is the author's own generation
+
+Answered the same day it was asked. Vitalii generated the track himself, so the Suno account the C2PA
+manifest names is his: the file meets the "self-made" half of this project's media rule and nothing is
+owed to a third party.
+
+Two things from the investigation are worth keeping even though the question is closed. The mp3
+carries a **signed C2PA manifest** recording the track as `trainedAlgorithmicMedia`, and the shipped
+`.ogg` is a transcode that **dropped it** — so the provenance evidence lives in the file that does not
+ship. And the question was only findable at all because it was written into `VISION.md` §Still open
+rather than left in a file no sweep reads; v0.9 had itself just added the rule that says so.

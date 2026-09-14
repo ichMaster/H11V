@@ -68,3 +68,17 @@ this track anywhere in the repository, and it should not be treated as cleared f
 
 This is deliberately not a `LICENSE` file. Writing one would mean choosing a licence, and choosing
 one is exactly what nobody in this repository is currently in a position to do.
+
+---
+
+## Answered — 14 September 2026
+
+**The author generated it.** Vitalii confirmed that the Suno account named in the manifest above is
+his, which settles both questions this file was opened to ask: the track is this project's own work,
+and it meets the "self-made" half of `CLAUDE.md`'s "self-made or CC0" media rule.
+
+What the investigation was still right to establish, and is worth keeping: the mp3 carries a signed
+C2PA manifest recording that it is `trainedAlgorithmicMedia` from Suno, and the shipped `.ogg` is a
+transcode that **dropped that manifest**. If the project is ever redistributed somewhere that asks
+about AI-generated media, the answer is here and the evidence is in the mp3, not in the file that
+ships.

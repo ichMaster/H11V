@@ -4,6 +4,33 @@ H11V release log
 Newest first. A release is cut per roadmap phase (vA.B -> A.B.0); a post-release
 fix on that phase bumps the third number. See specification/SDLC.md.
 
+0.9.1 — 2026-09-14 — the harden sweep
+-------------------------------------
+
+  The phase-boundary sweep over what v0.9 left open. One MEDIUM closed; two
+  held with reasons.
+
+  * The seam metric can see transparency now (M15). It diffed colour channels
+    only, so on h11_bloom -- 47% transparent over uniform black -- the boundary
+    between filament and void inflated the interior figure, the scaled threshold
+    rose to 106.8, and the wrap between two identical black edges read 5.8. The
+    one binary-alpha texture with a tiling check had no effective tiling check.
+
+    All three candidate repairs were measured before one was chosen, and two are
+    individually useless: premultiplying alone is a no-op here (the hidden
+    colour is already black), and adding alpha alone makes it worse. So all
+    three -- premultiplied colour, the alpha delta weighted as a whole triple,
+    and an absolute ceiling on the threshold. Every opaque face measures exactly
+    what it measured before, to the digit.
+
+    The regression test ships inside the gate, because the gates are this
+    project's suite, and it is mutation-tested: revert any half of the fix and
+    its own fixtures catch it.
+
+  Held by the escape hatch: M19 and M20 constrain code that does not exist until
+  v2 and v4, and the prefab/regolith_side hue pair needs a texture redrawn
+  rather than a gate repaired.
+
 0.9.0 — 2026-09-14 — the review pass
 ------------------------------------
 

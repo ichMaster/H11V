@@ -222,8 +222,9 @@ table.
    demands 3.2× the DoD.
 4. **Game code** (M1, M2, M3, M25, and the Lua LOWs). Pin `mgv7_spflags` so the "one dial" terrain
    claim is true outside the measured window; drop the inert `min_luanti_version`; stop `settle()`
-   spawning the player on top of bloom crowns; set `zoom_fov = 0` so the engine stops drawing a zoom
-   magnifier over the playfield that turns the camera when tapped.
+   spawning the player on top of bloom crowns; set `zoom_fov = 0` so the zoom magnifier over the
+   playfield stops zooming — 5.10 draws the button unconditionally and a tap still reaches `turn.lua`
+   as a turn, so the residue is recorded rather than removed (review M25, partial).
 5. **The art audit** (H9, M22, M23). The delivery inverted §4.1 Rule 1's ladder *order* while three
    documents certify compliance; two Rule-2 collisions and a fourth Rule-5 pair were never audited.
    Correct the audit, not the art.

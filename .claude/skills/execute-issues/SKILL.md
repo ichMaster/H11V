@@ -76,7 +76,7 @@ architecture in `specification/ARCHITECTURE.md`. Route by component ([architectu
 - **The bots** (`games/h11v/mods/h11_bots/`, from v2): `body`, `needs`, `intent`, `perception` and the Lua StubBrain. The body runs on fast ticks and **never blocks on the network**; the brain is asked at exactly four wake conditions and its answer is collected on a later step.
 - **The engine is not ours** (Luanti): no forks, no patches. Where a need looks like it wants a new engine feature, find the stock primitive — the table in `specification/ARCHITECTURE.md` §Engine primitives lists the ones this project stands on.
 - **Three engine strictnesses** that fail silently rather than loudly, all in `specification/ARCHITECTURE.md`: tile order needs a *triple* for turf; water needs a source/flowing *pair*; surface layers come from `core.register_biome`, never from the v6 `mapgen_dirt*` aliases.
-- **Assets are content** (`games/h11v/**/textures/`, `menu/`): committed **output**. The source of record is the delivered pack in `specification/art/h11v/`, installed by one rsync and never hand-edited in place — a re-delivery would erase the edit.
+- **Assets are content** (`games/h11v/**/textures/`, `menu/`): committed **output**. The source of record is the delivered pack in `specification/art/colony/`, installed by `tools/install_assets.sh` and never hand-edited in place — a re-delivery would erase the edit.
 - **Contract changes:** any change to a stable seam — the `NODES` table shape, the mutation rule table, the `Perception → Intent` contract, a mod boundary — updates `specification/ARCHITECTURE.md` **AND** the acceptance check that pins it, in the same commit. `Perception → Intent` additionally needs a line in `docs/decisions.md`.
 - Follow existing style and patterns; keep each phase self-contained (don't pull later phases in early). Lua is `local` by default: no globals outside the one table a mod exports.
 
@@ -89,8 +89,11 @@ and testing). There is no unit-test framework — these four commands **are** th
    lines. Lua parse errors and broken resource paths surface here and nowhere else.
 2. **World:** `tools/test_worldgen.sh` — must exit **0**. This is the primary gate;
    run it for every issue, whatever the issue touched.
-3. **Art:** `tools/check_assets.py` — must report every file conforming. Required whenever
-   `assets/` or `specification/art/h11v/` changed.
+3. **Art, and the node-catalogue contract:** `tools/check_assets.py` — must report every file
+   conforming. **Required for every issue**, not only when art changed: since v0.9 it also compares
+   the node ids named in `specification/ARCHITECTURE.md` §Components against the ids `nodes.lua`
+   registers, and the change class that drifts those two apart is exactly the one that touches no
+   art. It costs about a second. The pack of record is `specification/art/colony/`.
 4. **Visual:** `tools/run_local.sh` — a 640x480 window on the Mac: walk, dig, place, no missing textures.
    Required whenever rendering, shaders, the HUD or the map changed; **read at least one frame back**
    and confirm it shows what the issue claims.

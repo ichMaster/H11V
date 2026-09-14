@@ -97,3 +97,9 @@ repository — the tooling in `codegen/` and `.claude/skills/` is shared machine
    quantized model rather than anything comfortable — which model is the part still open.
 3. Whether the README and the player guide stay Ukrainian while the code and specifications are
    English.
+4. **Under what licence the shipped music may be redistributed.** Origin is established and the
+   licence is not: both audio files carry Suno metadata and the mp3 a signed C2PA manifest naming an
+   account, but the repository cannot say whether that account is this project's author or what its
+   plan allows — see `games/h11v/mods/h11_world/sounds/PROVENANCE.md`. Two questions for the author,
+   and until they are answered the track is not shown to meet this project's "self-made or CC0" rule.
+   Raised by the v0.9 review; it blocks nothing in the game and everything in a redistribution.

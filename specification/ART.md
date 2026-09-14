@@ -14,9 +14,10 @@ Part one governs. Part two is how it was realised for v0 and the template for ev
 > own vocabulary, and recolouring them cannot escape it.
 >
 > This document remains authoritative for two things: **the UI voice** (dark glass panels, thin light
-> borders, cyan monospace type, the event and world-change cards, the bot panel) and **the v0 pack
-> that currently ships**, audited in §9. The bots' design language in `ref-02` also stands until the
-> M2 bot brief replaces it.
+> borders, cyan monospace type, the event and world-change cards, the bot panel) and **the record of
+> the v0 pack**, audited in §9 — that pack no longer ships; the colony pack does, and its audit is
+> [ART-COLONY.md](ART-COLONY.md) §11. The bots' design language in `ref-02` also stands until the v2
+> bot brief replaces it.
 
 ---
 

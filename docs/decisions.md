@@ -980,3 +980,27 @@ the horizon in a specification that says it does not.
 
 **What none of this is:** implementation. No Lua changed. The value is entirely that the next
 `generate-issues` run decomposes one design instead of two.
+
+### 2026-09-14 — The music's origin is established and its licence is not
+
+Raised by v0.9's review: `games/h11v/mods/h11_world/sounds/h11_world_music.ogg` and its source
+`specification/art/SilentBeeps.mp3` have shipped since v0.7 with no provenance record anywhere, and
+no gate touches audio — so `CLAUDE.md`'s "self-made or CC0" rule was unverifiable for the one media
+asset in the repository that is not a PNG.
+
+Investigated rather than asserted. Both files carry Suno metadata (`title=Silent Beeps`,
+`artist=lili_jinx`, `made with suno`), and the mp3 additionally carries a **signed C2PA manifest** —
+`c2pa.created`, `digitalSourceType = trainedAlgorithmicMedia`, `providerName "Suno, Inc."`, signed by
+Suno Content Credentials and DigiCert-countersigned. The ogg is a transcode that dropped the manifest.
+Neither commit message says where the file came from.
+
+So the origin is not in doubt and the **licence is**, on two questions the repository cannot answer:
+whether `lili_jinx` is this project's author (the git identity is `ichland`), and what that account's
+plan allows. `sounds/PROVENANCE.md` records all of it and **asserts no licence** — an honest "unknown,
+needs the author" being the correct output when that is the truth.
+
+It is now the fourth entry in VISION's §Still open rather than a note in a file no sweep reads, which
+is the actual finding: v0.9 itself added the rule that a finding recorded outside
+`specification/implementation/*code-review*.md` "is a note, not a work item", and then wrote this one
+into exactly such a place and closed the work item. **It blocks nothing in the game and everything in
+a redistribution.**

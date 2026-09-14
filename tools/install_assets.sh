@@ -10,6 +10,13 @@
 # specification/art/h11v/ one — so switching resolution is one command in either
 # direction with nothing else to edit and nothing to restore from a backup.
 #
+# One direction is currently RED, and knowing that beforehand is worth a line:
+# --res=16 halves h11_crate_side.png into a broken horizontal wrap (59.4 against
+# an interior of 10.0) and the verify step fails. It is not a regression — the
+# same halving produced the same seam before v0.9 made the verify step's status
+# actually count — but the 16px path cannot install green until that flank is
+# redrawn or given a documented halving exception (review N2).
+#
 #   rsync   the pack in, replacing whatever is there
 #   halve   node textures, unless --res=32
 #   strip   the content-credential metadata (146 KiB that would cross the

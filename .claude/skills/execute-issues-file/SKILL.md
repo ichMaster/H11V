@@ -67,7 +67,9 @@ For each issue:
    `specification/ARCHITECTURE.md` **and** its acceptance check in the **same** commit; changing
    `Perception → Intent` also needs a line in `docs/decisions.md`. MVP-first (don't pull later phases
    in early).
-4. **Validate:** `check_lua.sh`, `test_worldgen.sh`, and `check_assets.py` / `run_local.sh` when the
+4. **Validate:** `check_lua.sh`, `test_worldgen.sh` and `check_assets.py` — the last of these runs
+   for **every** issue since v0.9, because it also pins the `ARCHITECTURE.md` §Components ↔
+   `nodes.lua` node-id contract — plus `run_local.sh` when the
    change warrants them — **the engine runs headless and nothing calls a paid API.** Walk each
    acceptance criterion against the phase DoD/Tests in `specification/ROADMAP.md`. Record pass/fail.
 5. **Commit** (one issue = one commit; only code that passes validation):

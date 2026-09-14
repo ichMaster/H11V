@@ -47,8 +47,9 @@ PACK = ROOT / "specification" / "art" / "colony"
 TEX = "mods/h11_world/textures"
 MENU = "menu"
 
-# Node textures are authored at 32x32 and ship at 16x16, halved 2:1 by
-# tools/downscale_pack.py at install. So the same contract has two valid sizes
+# Node textures are authored at 32x32 and ship at 32x32. The 16x16 trial was run
+# on the device and reverted (docs/decisions.md), but tools/downscale_pack.py and
+# install_assets.sh --res=16 still exist, so the same contract has two valid sizes
 # depending on which tree is being checked, and the tables below are written at
 # the AUTHORING size with the game tree scaled down by NODE_SCALE. Writing two
 # tables instead would be two places for the alpha regimes and colour budgets to

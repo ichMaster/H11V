@@ -311,7 +311,10 @@ pack, up to 97% of a single file, crossing the network on every deploy.
 **Node textures are authored at 32x32 and ship at 32x32.** The halving flag stays because the trial
 was real: 16x16 was built, installed, looked at on the panel and rolled back the same day
 (`docs/decisions.md`, "32x32 stands. The 16x16 trial was run on the device and reverted"). It cost one
-command each way precisely because the delivery of record is never modified — and it retired two
+command each way precisely because the delivery of record is never modified — though **the 16x16
+direction is red today**: halving breaks `h11_crate_side.png`'s horizontal wrap and the install's
+verify step fails, so that flank needs redrawing or a documented halving exception before the flag
+works again (v0.9 review, N2). The trial retired two
 plausible arguments permanently, which is why the reasoning is kept here rather than deleted with the
 decision. Halving discards real detail (only 44% of the pack's 2x2 blocks are uniform), and it does
 **not** reduce shimmer at distance (measured: the difference is inside the noise, because

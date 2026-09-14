@@ -178,6 +178,66 @@ screenshot off the device: the growth density that was right for green canopies 
 magenta at the same value, and the gate above was measuring the wrong quantity. The gates prove the
 world contains what it should; they have no opinion about whether it can be looked at.
 
+### v0.9 — The review pass
+
+**Goal:** close the findings of the v0.8 full review, so v1 is built on documents that describe the
+code and gates that measure what they claim.
+
+Not planned when v0 was written. A 7-dimension adversarial review at tag `0.8.0`
+([v0.8-code-review.md](implementation/v0.8-code-review.md), `codegen/` out of scope) raised 71
+verified findings — 9 HIGH, 27 MEDIUM, 35 LOW — and their shape is the phase's shape: the code
+survived adversarial reading almost untouched, while **six of the nine HIGHs are specification lines
+that would misdirect the next contributor**, starting with `CLAUDE.md` still declaring the repository
+"specification-only — no code exists yet" and prescribing a video driver the device build refuses to
+start on. Fixing those before v1 is generated is the point of doing it now: `generate-issues`
+decomposes these documents.
+
+**Tasks**, grouped as they should be executed. Each finding id below refers to the review's summary
+table.
+
+1. **Credentials and the deploy** (H1, M4, M7, L13, L17). The device password reaches `ps`-visible
+   argv through `rsync`'s `-e`, which rsync never masks — move every `sshpass -p` to `-e`. Make the
+   post-launch renderer confirmation real rather than dead code (`debug_log_level = info`, grep the
+   engine's own log, warn loudly when there is no evidence). Wait for the engine to be *gone* after
+   the SIGKILL escalation before swapping the config, mirroring what `--stop` already does.
+2. **The documentation pass** (H4, H5, H6, H7, H8, M21, M27). Rewrite `CLAUDE.md`'s Current state,
+   Device constraints and layout/milestones sections from `tools/device/minetest.conf` and
+   `ARCHITECTURE.md`; bring `ARCHITECTURE` §Components (13 nodes, six modules) and §Assets (32×32,
+   the colony pack) in line with the code; correct SDLC's `/ship-solution` row; schedule the recorded
+   world-size debt into v1.
+3. **Gate repairs** (H2, H3, M10, M11, M12, M13, M14, M16). Every one is a gate that lies or dies:
+   `run_local.sh` forwards its own parsed flags to the engine and crashes on all documented usage;
+   `check_assets.py --pack` audits the retired v0 pack; `check_lua.sh` parses with a Lua dialect the
+   engine rejects; `mktemp -t` is a BSD-ism in a gate meant to run on the Pi; `MIN_TREES=4` silently
+   demands 3.2× the DoD.
+4. **Game code** (M1, M2, M3, M25, and the Lua LOWs). Pin `mgv7_spflags` so the "one dial" terrain
+   claim is true outside the measured window; drop the inert `min_luanti_version`; stop `settle()`
+   spawning the player on top of bloom crowns; set `zoom_fov = 0` so the engine stops drawing a zoom
+   magnifier over the playfield that turns the camera when tapped.
+5. **The art audit** (H9, M22, M23). The delivery inverted §4.1 Rule 1's ladder *order* while three
+   documents certify compliance; two Rule-2 collisions and a fourth Rule-5 pair were never audited.
+   Correct the audit, not the art.
+6. **Design reconciliation** (M17, M18, M19, M20). ROADMAP v1 still replays missed cycles that the
+   architecture settles are never replayed; `h11_build` is scheduled in no phase; the plan seam has no
+   transport; the v4 anchor contradicts the frontier function's stated purity.
+7. **Housekeeping** (L30, L32, L34, and the remaining LOWs). A `mod.conf` for the worldgen probe
+   before an engine upgrade turns the per-issue gate red for an unrelated reason; five stray venvs at
+   the repository root; the `docs/device/` screenshots marked as the pre-retheme record they are.
+
+**DoD:** every HIGH and MEDIUM in the review's table is either fixed or explicitly re-classified as
+deferred **in that document**, with the reason; the review document carries a Status per finding; all
+five acceptance gates green; `tools/check_assets.py --pack` audits the colony delivery; no
+specification document contradicts the shipped code on a load-bearing detail.
+
+**Tests:** the existing gates, plus what this phase adds to them — `check_assets.py` must reject a
+flattened RGB re-export of a binary-alpha texture and an out-of-band node resolution; `check_lua.sh`
+must report which checker it used; `test_worldgen.sh` keeps passing after the `mgv7_spflags` change
+(the terrain moves, so the numbers are re-recorded rather than the thresholds re-tuned).
+
+**Note on scope.** `codegen/` findings are deliberately excluded from this phase. M15 (the
+alpha-blind seam metric) is deferred to the next art re-delivery; M19 and M20 are recorded as design
+constraints rather than implemented, since the code they constrain does not exist until v2 and v4.
+
 ---
 
 ## v1 — The world: H11 mutates it

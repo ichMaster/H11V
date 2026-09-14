@@ -891,3 +891,92 @@ This is also why `leafdecay` came off the bloom row in the same change. It was a
 convention no engine code implements, advertising decay this game deliberately does not ship — while
 `leaves`, the group beside it, is now genuinely load-bearing: the spawn descent reads it to tell
 growth from ground.
+
+### 2026-09-14 — The anchor is frontier data, not a veto on the ABMs
+
+A recorded decision with a consequence nobody had followed through. The v4 anchor is promised as "a
+boundary contact cannot cross" and the frontier is a pure function of `(pos, cycle, seed)` — and the
+two sentences do not fit together, because **contact is explicitly not what computes the boundary**.
+An anchor implemented where it looks like it belongs, as a suppression check inside the ABMs, would
+suppress the *drawing* and not the *decision*: a block loading behind the anchor asks
+`infected(pos, cycle)`, gets a function that never heard of the anchor, and comes back infected. The
+quarantine would hold in the blocks the player was standing in and be holey everywhere else — which
+is precisely the loaded-blocks-only failure the frontier was introduced to kill, arriving from the
+other side and looking like a bug in the anchor.
+
+**Decision:** the anchor is **an input to the frontier**. Placements and removals append to a
+persistent, ordered log, and the function's real inputs are `(pos, cycle, seed, anchors)`:
+
+```
+infected(pos, cycle) = dist(pos, focus) < r(cycle) + noise(pos)
+                       and not shielded(pos, cycle, anchors)
+```
+
+**Why this shape and not another.** It keeps the one invariant that matters: the log is an *input*,
+so the function stays pure and two players on one seed with one anchor history still get one world.
+And it keeps the wall up while the device is off, which a live check cannot do at all.
+
+`shielded` takes the cycle for a reason that is a design decision rather than an implementation
+detail: an anchor planted at cycle 12 must not un-infect what cycle 5 already took. It is a wall,
+not an undo. A player who plants one late gets to keep what is left, and that is the more
+interesting game.
+
+**What it costs, accepted:** the anchor log becomes save data the frontier cannot answer without — a
+new persistent structure on the critical path of every lazy evaluation, and one more thing a
+corrupted world loses. It is small (placements, not blocks), it is append-only, and it is written
+when the anchor is placed rather than when the player next looks at it. Recorded now, in v0.9,
+because the alternative is discovering it in v4 with the frontier already shipped and its signature
+already relied on.
+
+### 2026-09-14 — v1 is planned against the frontier, and the second seam gets a phase
+
+The infection design was settled on 13.09 and written into `ARCHITECTURE.md`. The roadmap was never
+reconciled with it, and `generate-issues` decomposes the roadmap — so v1 would have been built from
+the model the architecture had already replaced, with every gate green, because no gate reads prose.
+
+Five corrections, in `specification/ROADMAP.md` and the two documents it points at:
+
+**v1.2 had nothing selecting targets.** It described the rules table and the ABMs that apply it,
+which is the *what*, and left the *which* unstated — and the only reading available to an issue
+writer was contact spread, the thing the architecture rejects by name. Now stated as two pieces: the
+frontier selects (`infected(pos, cycle)`, pure in position, cycle and seed), the rules transform,
+and the ABMs draw detail inside a boundary already decided.
+
+**v1.4 demanded replay.** Its DoD read "advances its cycles in a bounded, simplified way rather than
+running them all" — a bounded replay, when the architecture and `CLAUDE.md` both settle that missed
+cycles are *never* replayed. A block loading after a week is evaluated once. The phase is now named
+for that ("Catch-up, which is not catching up"), because "catch up" is what makes the loop look
+correct, and it carries the assertion that catches the wrong implementation: the two worlds must be
+node-identical **and** the long-absent one must cost the same order of work to emerge. A replay
+passes the first and fails the second.
+
+**`h11_build` was scheduled nowhere.** Marked a v2 mod in `ARCHITECTURE.md` twice — §Components and
+§Repository layout — and present in no phase of any version, so `/ship-phase v2` would have released
+a v2 without it and v3 would have had a model with one of its two promised seams. It is now **v2.5**,
+appended rather than inserted so nothing renumbers, with the validation caps written into the DoD —
+node names exist, volume inside the world, node count capped, all three before any write — and a
+rejection test per cap asserting that not one node was written.
+
+**The plan seam had no transport.** The only defined brain channel is `POST /decide` returning an
+`Intent`; a plan is thirty lines, emitted rarely, and not an `Intent`. Rather than decide it now,
+v3.1 — the phase that defines what a model may say to this game — now owes the choice, with the
+constraint written into both documents: **the `Intent` schema may not quietly grow a plan-shaped
+field**, because the Lua StubBrain answers that schema with no network, and a plan that can only
+arrive inside an intent turns the fallback into a dead end. Two shapes are on the table (a `build`
+intent carrying a plan reference the mod fetches, or a second endpoint with its own wake condition
+and budget) and whichever wins gets a line here, like any change to a protected seam. That is also
+why both contracts are now described the same way in `ARCHITECTURE.md`: there were two seams and one
+of them was documented as unprotected.
+
+**And the world's size finally has a home.** `docs/decisions.md` owed it to v1 on 13.09 (see "The
+world is still unbounded"); no v1 phase mentioned it. It is now v1.1's, beside the biomes, because
+it is the same conversation twice — three biomes need an area to be distributed across and v1.2's
+frontier radius needs an area to be measured against — with the VISION update and the re-derived
+thresholds in the DoD. `VISION.md`'s "no infinite generation" pillar now says it is an intention
+through v0 rather than describing a game that exists. And v0.9's `mgv7_spflags` pin sharpened the
+bill rather than paying it: the terrain outside the measured window is honest now — the highest
+surface in a 48-site sweep out to radius 8000 fell from y = 179 to y = 31 — and it still stretches to
+the horizon in a specification that says it does not.
+
+**What none of this is:** implementation. No Lua changed. The value is entirely that the next
+`generate-issues` run decomposes one design instead of two.

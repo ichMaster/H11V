@@ -3,9 +3,10 @@
 ## Overview
 
 Three layers, and the boundary between them is the whole design. **Engine** — Luanti, unmodified —
-draws, lights, saves, generates and persists. **Data** — the block catalogue, the mutation rules, the
-bot needs profiles — describes what this world is. **Mods** — `h11_world`, `h11_bots`, `h11_hud` —
-are the only code we write, and they turn that data into a game inside the engine's own primitives.
+draws, lights, saves, generates and persists. **Data** — the block catalogue, the mutation rules,
+the bot needs profiles — describes what this world is. **Mods** — `h11_world`, `h11_bots`,
+`h11_build`, `h11_hud` — are the only code we write, and they turn that data into a game inside the
+engine's own primitives.
 
 Nothing patches or forks the engine, at any version. That is not modesty, it is the schedule: chunks,
 lighting, meshing, saving, inventory and touch controls already exist and are already fast on a Pi,
@@ -124,8 +125,10 @@ Each of these silently produces a wrong-looking world rather than an error, so t
 
 ## The `Perception → Intent` contract
 
-The seam between a bot's body and its brain, and the one thing in this architecture that may not
-change without a line in the decisions log.
+The seam between a bot's body and its brain, and the **first of the two** things in this
+architecture that may not change without a line in the decisions log. The other is the plan
+vocabulary below. Two, because a model answers two contracts; nothing else in this document is
+protected that way.
 
 ```
 body (fast ticks)  ──Perception──>  brain  ──Intent──>  body
@@ -144,7 +147,8 @@ body (fast ticks)  ──Perception──>  brain  ──Intent──>  body
 
 ## The build catalogue
 
-The second contract a model answers, and the reason a model can build at all.
+The second contract a model answers, protected on the same terms as the first — it does not change
+without a line in the decisions log — and the reason a model can build at all.
 
 **A model does not emit blocks.** Asked for a station it would have to produce tens of thousands of
 coordinates, which it cannot do reliably — it loses count and drifts, and the answer is enormous. So
@@ -182,6 +186,19 @@ exist in `core.registered_nodes`, the bounding volume must lie inside the world,
 must be computed and capped. A model that is wrong by an order of magnitude asks for ten million
 blocks, and the engine will honestly try.
 
+### How a plan arrives is not decided yet
+
+Written down because an unnamed transport is an improvised one. The only brain channel this document
+defines is `POST /decide` returning an `Intent`, and a plan is not an `Intent`: it is thirty lines
+rather than five values, it is emitted rarely rather than on four wake conditions, and it fails
+differently. Two shapes are plausible — a `build` intent carrying a plan *reference* the mod then
+fetches, or a second endpoint with its own wake condition and its own call budget — and the
+constraint on both is the same: **the `Intent` schema may not quietly grow a plan-shaped field.**
+That schema is answered by the Lua StubBrain with no network at all, and the moment a plan can only
+arrive inside an intent, the fallback stops being a fallback and the v3 swap stops being free. The
+choice belongs to v3.1, the phase that defines what a model may say to this game, and it needs a
+line in `docs/decisions.md` like any other change to a protected seam.
+
 ## Mutation is an infection
 
 H11 is not a per-block dice roll. It is an **infection spreading from a focus**, and that framing is
@@ -208,6 +225,29 @@ So the two levels are separated:
 - **The detail is ABMs**, working *inside* a boundary that has already been decided. Contact spread
   survives as local drawing — which block, which glyph, which crack — never as the thing that computes
   the boundary.
+
+### The anchor is an input to the frontier
+
+The v4 quarantine follows from that split rather than sitting beside it, and the natural
+implementation is the wrong one. An anchor that suppressed mutation by vetoing ABMs would suppress
+almost nothing: the ABMs only draw detail, the frontier decides the boundary, and a block loading
+behind an anchor computes `infected = true` from a function that never heard of it. The quarantine
+would hold where the player was standing and be holey everywhere else — which is the failure the
+frontier exists to prevent, arriving from the other side.
+
+So an anchor is **data the frontier reads**. Placements and removals are appended to a persistent,
+ordered log, and the function's real inputs are `(pos, cycle, seed, anchors)`:
+
+```
+infected(pos, cycle) = dist(pos, focus) < r(cycle) + noise(pos)
+                       and not shielded(pos, cycle, anchors)
+```
+
+`shielded` takes the cycle because an anchor planted at cycle 12 must not un-infect what cycle 5
+already took: it is a wall, not an undo. The function stays pure — the log is an input, not a side
+effect — and the wall stays standing while the device is off. What it costs is that the log becomes
+save data the frontier cannot answer without, so it is written when the anchor is placed and not
+when the player next looks at it.
 
 ### Determinism is the invariant
 

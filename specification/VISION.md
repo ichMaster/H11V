@@ -57,7 +57,11 @@ product; we do not have one.
   whenever it answers. With no server, the bots keep living on rules.
 - **The world is small on purpose.** One map on the order of 128×128 blocks, a few biomes, no
   infinite generation. A pocket world you can come to know is the point; an endless one you cannot is
-  a different game.
+  a different game. **Through v0 this is an intention and not a setting**: the shipped game generates
+  an unbounded world, because the engine's `mapgen_limit` generates only mapchunks lying wholly inside
+  it and a mapchunk is 80 nodes — so the sizes on offer are 80×80 and 240×240, and 128×128 is not one
+  of them (`docs/decisions.md`, 13 Sep 2026). v1.1 chooses a bound, and this line is rewritten to the
+  number that shipped. That makes it scheduled rather than open: the phase carries the DoD.
 
 ## The arc
 

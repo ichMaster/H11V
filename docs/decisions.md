@@ -830,3 +830,64 @@ Three things came out of re-measuring rather than re-reading, and they are recor
   top/side step for a live collision between two layers of the same column. The pair is accepted at
   +2.9 with the reason stated instead.
 
+## v0.9 — The review pass
+
+### 2026-09-14 — The one dial was never the only dial: v7's mountains and rivers were still on
+
+`mapgen.lua` pinned three noise parameters and claimed height was "simply terrain_base". It was not.
+`mgv7_spflags` was never set, so the engine default — `mountains,ridges,nofloatlands,caverns` — kept
+running v7's **mountain pass** (`mgv7_np_mount_height`, offset 256, scale 112, spread 1000) and its
+**ridge river-carving**, neither of which reads any of the three pinned noises. The file also said in
+so many words that "the pocket world has lakes and a sea, not rivers", beside a river-water alias.
+
+**Measured, because inside the gate's window nothing shows.** Two headless worlds on the same seed,
+48 sample sites out to radius 8000:
+
+| | highest surface | the patches at (1000,1000) and (500,−2500) |
+|---|---|---|
+| engine defaults | **y = 179** at (−2393, 0) | solid meltwater at the water line — ridge-carved channels |
+| flags pinned | **y = 31** | dry land |
+
+The island's own surface runs 6–25, and `test_worldgen.sh` reported byte-identical numbers before and
+after the pin. That is the whole point: the gate measures 128×128 and the world is deliberately
+unbounded, so a player walking out of the measured window met mountains above the biome's `y_max` —
+bare lithic, no regolith, no growths — and canyons the design says do not exist.
+
+### 2026-09-14 — zoom_fov is an object property, and it does not remove the button
+
+Two corrections, one of them to this review's own finding.
+
+`tools/device/gamepad.conf` carried `zoom_fov = 72` and a confident comment that it made zooming a
+no-op. It is **not a client setting at all** — it is a player object property — so the engine ignored
+the line the way it ignores any unknown key, which is the real reason the v0.7.1 measurement recorded
+that "zoom_fov = fov did NOT work". The line is gone; `fov = 72` stays, because the three profiles
+were measured at it.
+
+And the review claimed that setting the property to 0 "kills the button". **It does not on 5.10.**
+Read in that version's `touchcontrols.cpp`: the zoom button is added unconditionally, with no
+zoom-capability test. So the property silences what the button *does* — the camera never enters its
+zoom branch — while the button and its tap zone stay on screen, and a tap still reaches `turn.lua` as
+a turn. The magnifier is cosmetic residue until 5.11's touchscreen layout editor.
+
+The `Aux1` label is conditional on exactly one setting, `virtual_joystick_triggers_aux1` — but turning
+it on moves aux1 onto the virtual joystick, so every movement drag that leaves the centre circle would
+turn the camera right. A live misfire in exchange for a dead label is a bad trade; it stays.
+
+### 2026-09-14 — A quarter of spawns landed on a crown, and the fallback that fix needed
+
+`settle()` stopped its descent at the first solid node with two clear above it. Under a growth that
+node is the **top of the bloom crown**, so the player was placed standing on the canopy; the
+keep-descending branch could only ever fire for an interior gap. Measured over all **6228** real
+spawn candidates in the 81×81 columns around the origin on the shipped seed: **1122 of them — 18% —
+landed on bloom.**
+
+Descending through the `tree` and `leaves` groups fixes it, but the naive form regressed 225
+candidates (3.6%) from "standing on a crown" to "left at the unsettled candidate" — the trunk column,
+and more often a crown resting on a neighbouring rise, where there is no ground with headroom in the
+window at all. So the loop keeps the topmost growth-top as a **fallback** and uses it only when no
+ground qualifies. Final: 6003 on ground, 225 on a crown, **0 nowhere**.
+
+This is also why `leafdecay` came off the bloom row in the same change. It was a minetest_game
+convention no engine code implements, advertising decay this game deliberately does not ship — while
+`leaves`, the group beside it, is now genuinely load-bearing: the spawn descent reads it to tell
+growth from ground.

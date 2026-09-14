@@ -92,11 +92,21 @@ local NODES = {
 		-- The crown: hanging crystal filaments. allfaces_optional lets the engine
 		-- collapse it to a cheaper draw on the low graphics profile, which is what
 		-- v0.7 measured.
+		--
+		-- `leafdecay = 3` stood here and is deliberately gone. It is a
+		-- minetest_game convention, not an engine group: stock Luanti attaches no
+		-- behaviour to it, and this game ships no decay ABM on purpose (mapgen.lua
+		-- says why). So the row advertised a rule nothing implements — dig a spire
+		-- and its crown hangs in the air for the life of the world. A row in this
+		-- table is read as the block's behaviour, by a person now and by v1's
+		-- mutation rules later, and a group that only looks like behaviour is worse
+		-- than no group at all. `leaves` stays and is real: player.lua's spawn
+		-- descent reads it to tell growth from ground.
 		id = "bloom",
 		description = S("Bloom"),
 		drawtype = "allfaces_optional",
 		tiles = { "h11_bloom.png" },
-		groups = { snappy = 3, leafdecay = 3, leaves = 1 },
+		groups = { snappy = 3, leaves = 1 },
 		extra = { paramtype = "light", waving = 1, sunlight_propagates = true },
 	},
 	{
@@ -114,9 +124,9 @@ local NODES = {
 		-- while a glowing crust is the fiction. From v1 the mutation front will
 		-- literally light the world as it spreads.
 		--
-		-- 12 of a possible 14: bright enough to work as a lamp, short of the
-		-- daylight ceiling, and one step below the colony's own beacon — the
-		-- player's light should be the better light.
+		-- 12 of a possible 14 (`core.LIGHT_MAX`): bright enough to work as a lamp,
+		-- short of the daylight ceiling, and two steps below the colony's own
+		-- beacon — the player's light should be the better light.
 		id = "crust",
 		description = S("H11 Crust"),
 		tiles = { "h11_crust.png" },
@@ -149,6 +159,15 @@ local NODES = {
 			liquid_alternative_flowing = "h11_world:melt_flowing",
 			liquid_alternative_source = "h11_world:melt_source",
 			liquid_viscosity = 1,
+			-- Stated on both rows of the pair and identical on both, though only
+			-- one copy is ever read: the engine takes the spread distance from the
+			-- FLOWING definition on every path (5.10 servermap.cpp resolves
+			-- `liquid_kind` to `liquid_alternative_flowing_id` before reading
+			-- `liquid_range`). This row said nothing and so carried the engine's
+			-- default of 8 while its partner said 7 — invisible today, and a trap
+			-- for the v1 rules row that clones this row's plumbing for a second
+			-- liquid and inherits a number nobody chose.
+			liquid_range = 7,
 			-- Sampled from the delivered texture (mean rgb 26,149,113): the tint
 			-- the screen takes when the player's head goes under. A leftover teal
 			-- from the v0 pack would have quietly disagreed with the water itself.
@@ -228,9 +247,9 @@ local NODES = {
 		-- to see at night was to stand near something H11 had rewritten. A player
 		-- should be able to light their own camp without the algorithm's help.
 		--
-		-- 14 is the engine's maximum, one above the crust. That ordering is
-		-- deliberate — what the colony built is the better lamp, and where the two
-		-- meet the beacon wins.
+		-- 14 is the engine's maximum (`core.LIGHT_MAX`), two steps above the
+		-- crust's 12. That ordering is deliberate — what the colony built is the
+		-- better lamp, and where the two meet the beacon wins.
 		id = "beacon",
 		description = S("Beacon"),
 		tiles = { "h11_beacon.png" },
@@ -294,8 +313,11 @@ end
 
 core.log("action", ("[h11_world] registered %d nodes"):format(#NODES))
 
--- Exported so mapgen.lua can address the catalogue by id, and so v1's rules table
--- has something to be written against. The only global this mod defines.
+-- Exported for v1's rules table, which is the first thing that will actually read
+-- it. Nothing reads it today: mapgen.lua names the ids it needs as string
+-- literals rather than looking them up here, so renaming a row means grepping the
+-- mod for the literal and not merely checking this table's declared consumers.
+-- The only global this mod defines.
 --
 -- Assigned, not read-then-assigned. `h11_world = h11_world or {}` reads a global
 -- that does not exist yet, and Luanti's strict-global check warns about exactly

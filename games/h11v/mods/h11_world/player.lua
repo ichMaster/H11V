@@ -77,17 +77,28 @@ end)
 -- core.get_spawn_level is the right tool: it asks the MAPGEN what the surface
 -- height at a column will be, which needs no loaded map and is available the
 -- instant a player joins.
-local WATER_LEVEL = 6
+--
+-- The sea's datum is read back from the mapgen rather than repeated here. This
+-- was a second copy of the 6 that mapgen.lua installs, and a spawn rule that
+-- carries its own idea of the water line goes on being plausible for exactly as
+-- long as nobody moves the sea. get_mapgen_setting returns the ACTIVE value as a
+-- string (lua_api.md), and init.lua loads mapgen before this file, so by now the
+-- value is the one the world will be generated with. The literal survives only as
+-- the fallback for a mapgen that somehow has no water level at all.
+local WATER_LEVEL = tonumber(core.get_mapgen_setting("water_level")) or 6
 
 -- get_spawn_level knows the TERRAIN and nothing about what grows on it, so a
--- column it calls a fine surface may have a tree standing on it — and the player
--- arrives embedded in a trunk, staring at brown. (Seen on the device: the overlay
--- read `pointed: h11_world:trunk` with the whole screen the colour of bark —
--- that block is called `spire` now, but the failure it describes is unchanged.)
+-- column it calls a fine surface may have a growth standing on it — and the
+-- player arrives embedded in a trunk, staring at brown. (Seen on the device: the
+-- overlay read `pointed: h11_world:trunk` with the whole screen the colour of
+-- bark — that block is called `spire` now, but the failure it describes is
+-- unchanged.)
 --
--- The map is not loaded at join time, so the trees cannot be looked up; instead
--- the candidates are spread far enough apart that a single 5x5 canopy cannot
--- cover two of them, and the fallback keeps walking outward.
+-- The map is not loaded at join time, so the growths cannot be looked up, and
+-- nothing in this function can avoid one: the spiral's 8-node spacing means a
+-- single 5x5 crown cannot cover two candidates, which is not the same as missing
+-- the one it does cover — measured, eighteen per cent of candidates have a growth
+-- over them. settle(), below, is what actually deals with them.
 local function spawn_for(x, z)
 	local y = core.get_spawn_level(x, z)
 	-- nil means the mapgen has no suitable surface there (underwater, or outside
@@ -131,32 +142,83 @@ end
 --
 -- So: use the mapgen's answer to pick a candidate, emerge a small area around it,
 -- and only then read the nodes and find real air. The player stands still for the
--- fraction of a second that takes, which is invisible, and arrives on grass
--- rather than inside bark.
+-- fraction of a second that takes, which is invisible, and arrives on the ground
+-- under the growth wherever the column leaves room to stand there.
+
+-- A GROWTH IS NOT GROUND, and until this was written the descent could not tell
+-- the difference. It stopped at the first non-air node with two air above it,
+-- and under a spire that node is the top of the bloom crown — the schematic puts
+-- nothing above the cap, so the cap has its two clear nodes and passes the test
+-- on the first try. The "keep descending" branch could only ever fire for a gap
+-- inside the crown, never for its top.
+--
+-- Measured headless on the real map at the shipped density, seed 20260913, over
+-- the 6228 spawn candidates in the 81x81 columns around the origin: 1122 of them
+-- — eighteen per cent — stood the player on a crown, usually five nodes above the
+-- regolith they were meant to be on. With the descent below, 897 of those land on
+-- the ground instead and the other 225 keep a crown top for the reason the
+-- fallback describes.
+--
+-- Group membership rather than node ids: `tree` and `leaves` are what the
+-- catalogue marks the stalk and the crown with (nodes.lua), and v1's biomes will
+-- add growths this file has never heard of.
+local function is_growth(name)
+	return core.get_item_group(name, "tree") > 0 or core.get_item_group(name, "leaves") > 0
+end
+
 local function settle(player, candidate)
+	-- By NAME, not by the ObjectRef. The emerge takes a moment, and a player who
+	-- leaves and rejoins inside that moment gets a new ObjectRef: the captured one
+	-- is then invalid, is_player() correctly refused it, and nothing ever settled
+	-- the player who is now standing at the unsettled candidate — the one case
+	-- this whole function exists to prevent. A name outlives the reconnection, and
+	-- nil simply means nobody holds it any more.
+	local name = player:get_player_name()
 	local pos = vector.new(candidate)
 	local min = vector.new(pos.x - 2, pos.y - 12, pos.z - 2)
 	local max = vector.new(pos.x + 2, pos.y + 12, pos.z + 2)
 
 	core.emerge_area(min, max, function(_, _, remaining)
 		if remaining ~= 0 then return end
-		if not player:is_player() then return end
+		local subject = core.get_player_by_name(name)
+		if not subject then return end
 
-		-- Walk down to the first solid node, stepping over anything growing, then
-		-- stand on top of it.
+		-- Walk down to the first ground node with room to stand, passing through
+		-- anything growing on the way, and keep the best growth-top seen as the
+		-- fallback.
+		--
+		-- The fallback is for a column where the growth sits ON the ground rather
+		-- than above it: the stalk's own column, and — more often, because the
+		-- terrain is not flat — a crown node resting directly on a neighbouring
+		-- rise. There is then no height in this column with both ground and
+		-- headroom, so the descent alone would find nothing and leave the player
+		-- at the unsettled candidate, INSIDE the growth: the "staring at brown"
+		-- failure this whole two-step dance was written for, and a worse outcome
+		-- than the crown-standing it replaced. Measured, that is 225 of 6228
+		-- candidates — 3.6 per cent, a fifth of all growth-covered columns — so it
+		-- is not a corner. Standing on the crown is what the old code did
+		-- everywhere; keeping it only where nothing better exists costs one local.
+		local on_growth
+
 		for y = max.y, min.y, -1 do
 			local here = core.get_node({ x = pos.x, y = y, z = pos.z }).name
 			if here ~= "air" and here ~= "ignore" then
 				local above = core.get_node({ x = pos.x, y = y + 1, z = pos.z }).name
 				local head = core.get_node({ x = pos.x, y = y + 2, z = pos.z }).name
-				if above == "air" and head == "air" then
-					player:set_pos({ x = pos.x, y = y + 1.5, z = pos.z })
+				local room = above == "air" and head == "air"
+				if room and not is_growth(here) then
+					subject:set_pos({ x = pos.x, y = y + 1.5, z = pos.z })
 					return
 				end
-				-- Solid, but something is standing on it (a trunk, a canopy).
-				-- Keep descending; the loop will find the ground under the tree,
-				-- and if that is also blocked the candidate is simply a bad one.
+				if room and not on_growth then on_growth = y + 1.5 end
 			end
+		end
+
+		-- No ground with headroom anywhere in the 25-node window: a crown top if
+		-- one was passed, and otherwise the candidate find_spawn chose, which is
+		-- simply a bad one.
+		if on_growth then
+			subject:set_pos({ x = pos.x, y = on_growth, z = pos.z })
 		end
 	end)
 end
@@ -246,10 +308,46 @@ core.register_on_joinplayer(function(player)
 		minimap = false,
 		wielditem = true,
 	})
-	-- Creative-flavoured for v0: the point is to walk, dig and place, not to
-	-- manage a supply. v1 can take this away when scarcity starts meaning
-	-- something.
-	player:set_properties({ hp_max = 20 })
 end)
 
-core.log("action", "[h11_world] player layer: hand, inventory, spawn, HUD")
+-- `set_properties({ hp_max = 20 })` stood here and is gone: 20 is already the
+-- engine's default for players on both versions (lua_api.md: "For players, this
+-- defaults to core.PLAYER_MAX_HP_DEFAULT (20)"), so it set nothing. Its comment
+-- claimed the game was "creative-flavoured", which read as "the inventory does
+-- not deplete" — it does, and place sixty-four hull plates and you have none.
+
+--- The camera: zoom off, and that is an input fix rather than a taste.
+--
+-- creative_mode gives every player the engine's default zoom_fov of 15 degrees
+-- (lua_api.md, Object properties: "Defaults to 15 in creative mode, 0 in survival
+-- mode"; "zoom_fov = 0 disables zooming for the player"). Nothing in this game
+-- wants a telescope, and on this device the property is actively harmful: L is
+-- carried on the `zoom` control as a transport for turning (turn.lua,
+-- tools/device/gamepad.conf), so every turn to the left also asked the client to
+-- zoom. That is the flash recorded in docs/decisions.md §Turning on L/R — the
+-- client applies the zoom FOV the instant the key goes down and the server's
+-- set_fov undoes it a step later — and zoom is not free even when it is undone:
+-- the API's own note is that it "loads and/or generates world beyond the
+-- server's maximum send and generate distances", which is map work on a Pi whose
+-- frame budget v0.7 measured to the millisecond.
+--
+-- With the property at 0 the client has no zoom FOV to apply, so there is
+-- nothing to predict and nothing to correct. Not yet re-measured on the panel —
+-- the device was in use when this landed — so turn.lua's FOV pin stays as the
+-- belt to this pair of braces, and is the thing that still holds if some later
+-- code path (a bot camera, a v1 tool) hands the zoom back.
+--
+-- What it does NOT do is remove the touch overlay's magnifier button or the
+-- `Aux1` label sitting over the right third of the playfield: 5.10 draws both
+-- unconditionally, whatever the player can actually do, and the taps they eat
+-- still reach turn.lua as a turn. That residue is recorded where the client
+-- settings live, in tools/device/gamepad.conf.
+core.register_on_joinplayer(function(player)
+	player:set_properties({ zoom_fov = 0 })
+end)
+
+-- The water level is in the line because it is DERIVED now rather than written
+-- here: this is where a run that spawns people in the sea would show that the
+-- mapgen setting never reached this file.
+core.log("action", ("[h11_world] player layer: hand, inventory, spawn above y=%d, HUD, zoom off")
+	:format(WATER_LEVEL))

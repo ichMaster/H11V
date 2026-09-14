@@ -3,7 +3,7 @@
 -- One looping track, started per player and stopped when they leave. Not
 -- positional: it is scored to the world, not emitted by anything in it.
 --
--- Two details that matter more than the six lines of code:
+-- Three details that matter more than the code they sit above:
 --
 -- The handle is kept per player and stopped on leave. Without that, a rejoin
 -- starts a second copy over the first, and by the fourth reconnection the game
@@ -13,15 +13,36 @@
 -- It is a setting, off-switchable, because background music is the first thing
 -- anyone turns off and the last thing a game lets them. Sound volume is already
 -- the engine's own control; this is the coarser "not at all".
+--
+-- The switch is PER PLAYER, and it used to be neither one thing nor the other:
+-- `/music off` flipped a single upvalue shared by everyone but stopped only the
+-- caller's handle. On a dev run with two clients against `luanti --server` — the
+-- way this game is played on the Mac — one player's "off" silenced every later
+-- joiner while the other player's loop went on playing: the command reached
+-- exactly the people it was not aimed at and missed the one it was. It also died
+-- with the process, so "off" had to be typed again after every restart.
+--
+-- The choice is kept on the player instead, where the handle already lives. Player
+-- metadata is stored in the world's player database (lua_api.md, PlayerMetaRef),
+-- so it survives a restart; the h11v_music setting is what a player who has never
+-- said anything gets.
 
 local MUSIC = "h11_world_music"
 local GAIN = tonumber(core.settings:get("h11v_music_gain")) or 0.5
-local ENABLED = core.settings:get_bool("h11v_music", true)
+local DEFAULT_ON = core.settings:get_bool("h11v_music", true)
 
 local playing = {}
 
+-- "" is an unset key, not an answer: a player who has never used the command
+-- follows the setting, and only an explicit choice overrides it.
+local function wants_music(player)
+	local choice = player:get_meta():get_string("h11v_music")
+	if choice == "" then return DEFAULT_ON end
+	return choice == "on"
+end
+
 local function start(player)
-	if not ENABLED then return end
+	if not wants_music(player) then return end
 	local name = player:get_player_name()
 	-- Defensive: if a handle survived somehow, drop it before making another.
 	if playing[name] then core.sound_stop(playing[name]) end
@@ -50,17 +71,17 @@ end)
 
 core.register_chatcommand("music", {
 	params = "[on | off]",
-	description = "Turn the background music on or off",
+	description = "Turn your background music on or off",
 	func = function(name, param)
 		local player = core.get_player_by_name(name)
 		if not player then return false, "not in game" end
-		if param == "off" then
-			if playing[name] then core.sound_stop(playing[name]); playing[name] = nil end
-			ENABLED = false
-			return true, "Music off."
+		local want = param ~= "off"
+		player:get_meta():set_string("h11v_music", want and "on" or "off")
+		if want then
+			start(player)
+			return true, "Music on."
 		end
-		ENABLED = true
-		start(player)
-		return true, "Music on."
+		if playing[name] then core.sound_stop(playing[name]); playing[name] = nil end
+		return true, "Music off."
 	end,
 })

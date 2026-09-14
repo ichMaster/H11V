@@ -26,12 +26,27 @@
 core.register_alias("mapgen_stone", "h11_world:lithic")
 core.register_alias("mapgen_water_source", "h11_world:melt_source")
 -- River water has no separate node in v0: the pocket world has lakes and a sea,
--- not rivers. Pointing it at the same source keeps the engine quiet and the
--- world consistent; v1 may give rivers their own node when biomes arrive.
+-- and no rivers because the v7 ridge pass is switched off below — a sentence
+-- that was a wish until `mgv7_spflags` was pinned, since the ridge pass ignores
+-- every noise this file tunes. The alias is still required (the engine reads all
+-- three for any mapgen but v6), so pointing it at the same source keeps the
+-- engine quiet and the world consistent; v1 may give rivers their own node if
+-- the biomes ever want them back.
 core.register_alias("mapgen_river_water_source", "h11_world:melt_source")
 
--- Mandatory for any game, even one with no caves or dungeons: the engine asks
--- for them during decoration and dungeon placement whether or not it uses them.
+-- NOT mandatory, contrary to what this comment used to claim: lua_api.md lists
+-- both under "Optional aliases" for every mapgen but v6, and marks both
+-- deprecated in favour of `node_cave_liquid` and `node_dungeon*` in the biome
+-- definition. Nothing consults them here at all, because caves and dungeons are
+-- off in `mg_flags` below.
+--
+-- They stay because they are one line each and they are the fallback the moment
+-- either flag is flipped for a look — without them a dungeon is built from the
+-- biome's stone and cave liquid falls back to the engine's classic lava-and-water
+-- noise, neither of which is a decision anyone made. The correction matters
+-- because this file is the record of which aliases are load-bearing, and v1.1
+-- writes the real biomes: that work should define the cave and dungeon nodes on
+-- the biomes, which is what the API asks for, rather than extending these.
 core.register_alias("mapgen_lava_source", "h11_world:lithic")
 core.register_alias("mapgen_cobble", "h11_world:lithic")
 
@@ -82,6 +97,38 @@ core.set_mapgen_setting("water_level", "6", true)
 -- confounded a measurement.
 core.set_mapgen_setting("mg_flags", "nocaves,nodungeons,light,decorations,biomes", true)
 
+--- The two v7 passes the noises below do not govern.
+--
+-- `mgv7_spflags` was never set, so the engine default `mountains,ridges,
+-- nofloatlands,caverns` ran. The mountain pass takes its height from
+-- `mgv7_np_mount_height` (offset 256, scale 112, spread 1000 —
+-- minetest.conf.example) and the ridge pass carves river channels, and NEITHER
+-- of them reads terrain_base, terrain_alt or height_select. So the single-dial
+-- reasoning written below was true only inside the 128x128 window the gate
+-- measures, where the mountain noise happens to fire almost nowhere — which is
+-- exactly why no gate ever caught this.
+--
+-- That window is not the world: the map is deliberately unbounded through v0
+-- (docs/decisions.md, "The world is still unbounded"). Measured headless on seed
+-- 20260913 over 3072 columns sampled at radii 400 to 8000, one run with the
+-- engine's flags and one with these, everything else identical:
+--
+--   default flags   highest surface y=179, and the patches at (1000,1000) and
+--                   (500,-2500) are solid meltwater at the water line — river
+--                   channels, beside an alias comment three screens up promising
+--                   a world that has none
+--   these flags     highest surface y=31, and both of those patches are dry land
+--
+-- The island's own surface runs 6 to 25. So a player walking out of the measured
+-- window was meeting a different game's terrain, and the biome stops dressing any
+-- of it above y_max = 200.
+--
+-- Spelled as the engine spells them, which is worth checking rather than
+-- assuming: an unrecognised flag name is dropped in silence, leaving the
+-- defaults in place and this comment describing a world nobody generated. The
+-- four names and the `no` prefix are from minetest.conf.example, §Mapgen V7.
+core.set_mapgen_setting("mgv7_spflags", "nomountains,noridges,nofloatlands,nocaverns", true)
+
 --- Terrain shape: a pocket island rather than a continent.
 --
 -- v7 does not take its height from one noise. It computes
@@ -95,9 +142,11 @@ core.set_mapgen_setting("mg_flags", "nocaves,nodungeons,light,decorations,biomes
 --
 -- So the blend is made deterministic and base is left as the only dial:
 -- height_select is pinned to a constant 1, and terrain_alt is kept in a narrow
--- band that can never exceed base. Height is then simply terrain_base, which is
--- what a 128x128 pocket world wants — a designer needs one number to turn, not
--- three interacting ones tuned for an endless continent.
+-- band that can never exceed base. With the mountain and ridge passes switched
+-- off above — without that line this paragraph is simply false outside the
+-- measured window — height is then the base/alt blend, which collapses to
+-- terrain_base. That is what a 128x128 pocket world wants: a designer needs one
+-- number to turn, not three interacting ones tuned for an endless continent.
 core.set_mapgen_setting_noiseparams("mgv7_np_height_select", {
 	offset = 1, scale = 0,
 	spread = { x = 500, y = 500, z = 500 },
@@ -153,8 +202,45 @@ core.set_mapgen_setting_noiseparams("mgv7_np_terrain_base", {
 --
 -- 0.010 puts roughly 160 growths on the 128x128 map: scattered groves, terrain
 -- visible between them, and the crowns still loud enough to be the thing the eye
--- goes to. tools/deploy_to_term35.sh --trees=N overrides it.
-local TREE_DENSITY = tonumber(core.settings:get("h11v_tree_density")) or 0.010
+-- goes to.
+--
+-- The number is a FILL RATIO — decorations per surface node — and not a count of
+-- growths, which is what `tools/deploy_to_term35.sh --trees=N` sounds like it
+-- takes. The override went straight to the engine unchecked, and both ends of
+-- the range fail quietly rather than loudly: at 10.0 or above the engine stops
+-- sampling and switches to complete coverage, a spire on every single surface
+-- node (lua_api.md, Decoration definition), which on this device is a world that
+-- will not draw; at zero or below nothing is placed at all, and the worldgen gate
+-- then goes red reporting growths=0, which reads like a broken schematic rather
+-- than like a typed argument. A fat-fingered `--trees=10` is one keystroke from
+-- `--trees=1.0`.
+--
+-- So the override is clamped to a band that is still absurd at both ends but
+-- survivable, and every applied override says so in the log, because a run that
+-- generates a different world than the shipped one should be readable from the
+-- log alone — that is the whole reason the setting exists (docs/decisions.md,
+-- "Tree density is a setting, because the forest hid the world").
+local DEFAULT_DENSITY = 0.010
+local MIN_DENSITY, MAX_DENSITY = 0.0005, 0.5
+local TREE_DENSITY = DEFAULT_DENSITY
+
+local requested = core.settings:get("h11v_tree_density")
+if requested then
+	local wanted = tonumber(requested)
+	if not wanted then
+		core.log("warning", ("[h11_world] h11v_tree_density=%q is not a number; keeping %g")
+			:format(requested, DEFAULT_DENSITY))
+	else
+		TREE_DENSITY = math.max(MIN_DENSITY, math.min(MAX_DENSITY, wanted))
+		if TREE_DENSITY ~= wanted then
+			core.log("warning", ("[h11_world] h11v_tree_density %g is outside [%g, %g]; clamped to %g")
+				:format(wanted, MIN_DENSITY, MAX_DENSITY, TREE_DENSITY))
+		else
+			core.log("action", ("[h11_world] tree density overridden: %g (shipped value %g)")
+				:format(TREE_DENSITY, DEFAULT_DENSITY))
+		end
+	end
+end
 
 local _ = "air"      -- readability in the layer tables below
 local T = "h11_world:spire"

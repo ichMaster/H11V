@@ -33,6 +33,42 @@ export DISPLAY="${DISPLAY:-:0}"
 # Harmless if a future build is the SDL one; ignored by this one.
 export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-wayland}"
 
+# A second tap on the Sway launcher must not reach the scale dance below. The
+# launcher gives no feedback and world generation takes seconds, so tapping again
+# is the reasonable thing to do — and the second instance would find the note the
+# first one left, read it as the leftovers of a crash, and put the panel back to
+# 1.25 *under* the running game. That game then renders 640x480 into a scaled
+# output, resampling every pixel of the 32x32 art: the one thing the dance exists
+# to prevent, with nothing on screen to say why it now looks soft. The v0.7
+# legibility judgement — do 32x32 textures read at 3.5 inches, answered yes by eye
+# on this panel (docs/decisions.md, 2026-09-13) — is the kind of call that would
+# then be made on a resampled frame. And whichever instance exited first would fire
+# restore_scale, leaving the survivor scaled for the rest of the session.
+#
+# So a live engine makes this launch a no-op, and one that says so rather than
+# looking like a dead button. It stops here: before the note is read, before
+# h11v-debug.txt is truncated under the running game, before the game symlink is
+# rebuilt, and before any trap is installed — nothing this process does can be felt
+# by the one already playing. Skipping only the dance and letting the second engine
+# start was the alternative and is worse: two servers on one sqlite world on a 4 GB
+# Pi, and the deploy's renderer check reading a log the newcomer had just emptied.
+#
+# The note below is therefore treated as stale only when no engine is running,
+# which is the case it was written for. Both process names are probed, as in
+# deploy_to_term35.sh's --stop — a Debian package install is "luanti", older builds
+# are "minetest", and which one is here is detected everywhere else in this file
+# rather than assumed. Where pgrep is missing the test is simply false and the
+# launch proceeds exactly as it did before this guard existed.
+engine_running() {
+  pgrep -x luanti >/dev/null 2>&1 || pgrep -x minetest >/dev/null 2>&1
+}
+if engine_running; then
+  echo "run_on_pi: the game is already running; this launch changes nothing" >&2
+  command -v swaynag >/dev/null 2>&1 && \
+    swaynag -t warning -m "H11V is already running" >/dev/null 2>&1 &
+  exit 0
+fi
+
 # The desktop runs the panel at scale 1.25 (an effective 512x384) so terminal
 # text stays readable at arm's length. That is right for the desktop and wrong
 # for this game: it renders 640x480, exactly the panel's mode, and any non-unit
@@ -50,6 +86,21 @@ for o in json.load(sys.stdin):
     if o.get("active"):
         print(o["name"], o.get("scale", 1)); break
 ' 2>/dev/null
+}
+
+# The scale sway_output prints is a JSON number that has been through Python, so a
+# panel already at unit scale arrives here as "1.0". Neither spelling the guard
+# below used to test for can reach it: "1.000000" is a form nothing in that chain
+# produces, and "1" only survives an integer. So the guard passed on every launch,
+# and a desktop already at scale 1 was reconfigured for nothing — a visible
+# flicker, a note written for a value that had not changed, and a "restore"
+# afterwards to what it already was (v0.8 review L14). One scale can be spelled
+# "1", "1.0" or "1.000000", so trim the trailing zeros before asking.
+is_unit_scale() {
+  case "$1" in
+    *.*) set -- "${1%"${1##*[!0]}"}"; [ "${1%.}" = "1" ];;
+    *)   [ "$1" = "1" ];;
+  esac
 }
 
 restore_scale() {
@@ -72,9 +123,11 @@ if [ -n "$SWAYSOCK" ] && command -v swaymsg >/dev/null 2>&1; then
   read -r OUTPUT OLD_SCALE <<<"$(sway_output)"
 fi
 
-if [ -n "$OUTPUT" ] && [ "$OLD_SCALE" != "1.000000" ] && [ "$OLD_SCALE" != "1" ]; then
-  # Persist BEFORE changing anything: the trap covers a clean exit, the file covers
-  # everything else - SIGKILL, a power cut, a second launch stepping on the first.
+if [ -n "$OUTPUT" ] && ! is_unit_scale "$OLD_SCALE"; then
+  # Persist BEFORE changing anything: the trap covers a clean exit, and the file
+  # covers what no trap can — SIGKILL and a power cut. A second launch is not on
+  # that list and never was: the file is what misleads it, and the liveness check
+  # above is what holds it back.
   printf '%s %s\n' "$OUTPUT" "$OLD_SCALE" > "$STATE"
   trap restore_scale EXIT INT TERM
   swaymsg output "$OUTPUT" scale 1 >/dev/null 2>&1

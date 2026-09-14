@@ -93,6 +93,46 @@ specification/implementation/
 
 The directory is committed: the reports are the record of how a version was built.
 
+### What the record actually is, and what the harden sweep reads
+
+A set is written **by the run**. A version shipped outside the pipeline has no set, and none is
+written for it afterwards — so this directory is not an index of the releases, and reading it as one
+is how review finding M26 was raised. What is there, as of v0.9:
+
+| versions | what exists | how they were shipped |
+| --- | --- | --- |
+| v0.1 | the full set | the pipeline |
+| v0.2 | issues, execution report, code review | the pipeline |
+| v0.3 | issues, execution report | the pipeline; no review was run |
+| v0.4–v0.6 | nothing | GitHub issues `H11V-014`…`H11V-018` driven by hand, without an issues file or reports |
+| v0.7–v0.8 | nothing | direct commits, no issue ids |
+| at tag `0.8.0` | `v0.8-code-review.md` | a full-**repository** adversarial review, not a review of v0.8's diff |
+| v0.9 | issues, github report, execution report | the pipeline, from the v0.8 review's findings |
+
+**The gap was not backfilled, and will not be.** An execution report is worth something because the
+run wrote it: it says which gates were green against work that was happening while it said so.
+Reconstructing five of them out of `git log` produces a document with the shape of evidence and none
+of the substance, indistinguishable on the page from one that was earned — and the next contributor
+would have no way to tell which they were reading. A report is written by its run or it is not
+written.
+
+**The findings, which is what M26 was actually about, are not missing.** `v0.8-code-review.md` read
+the repository at tag `0.8.0` — every line v0.4–v0.8 landed, plus every specification document —
+rather than one version's diff, and `harden-findings` globs
+`specification/implementation/*code-review*.md`. Those findings have been in the sweep's input since
+the day they were raised. What was missing was any document saying so, which is this section.
+
+Two rules follow, and they are what keeps the sweep honest:
+
+- **A full-tree review at a tag is the code review of record for every earlier version that has none
+  of its own.** It is named for the tag it read and its header states its scope, so what it covers
+  is checkable rather than assumed. `v0.8-code-review.md` covers v0.4–v0.8 on exactly that basis.
+- **`specification/implementation/*code-review*.md` is the only input the phase-boundary sweep has.**
+  A finding that must survive a phase boundary lives in one of those files, carrying a Status that
+  says fixed-with-a-commit or deferred-with-a-home. A finding recorded anywhere else — a commit
+  message, `docs/decisions.md`, an issue comment — is a note, not a work item, and no sweep will
+  ever come back for it.
+
 ## Instrumentation (`codegen/`)
 
 The subject-independent half. It watches the pipeline run and records it; it imports nothing from the

@@ -1016,3 +1016,54 @@ carries a **signed C2PA manifest** recording the track as `trainedAlgorithmicMed
 `.ogg` is a transcode that **dropped it** — so the provenance evidence lives in the file that does not
 ship. And the question was only findable at all because it was written into `VISION.md` §Still open
 rather than left in a file no sweep reads; v0.9 had itself just added the rule that says so.
+
+## v0.9 — the device pass
+
+### 2026-09-14 — The measurement script has been walking with a key the device does not bind
+
+Found on the panel, not by reading the script. A 25-second walk ended at `pos: (0.0, 17.5, 0.0)` —
+the spawn. Two separate defects, in the one script whose whole purpose is to produce the numbers
+`docs/decisions.md` records:
+
+**The walk key is wrong.** `measure_device.sh` holds `w`. `tools/device/gamepad.conf` sets
+`keymap_forward = KEY_UP`: on the panel the D-pad moves you and **W does nothing at all**. Measured
+both ways in the same session — `w` for 30 s left the player at the spawn; `Up` for 25 s reached
+`(37.2, 14.5, 24.6)`, 44 nodes away.
+
+**The throwaway keystroke never fired.** The line above the walk exists specifically to absorb the
+swallowed first key of a session, and its comment records that it was added *because* the first
+profile consistently came back un-walked. It sent `wtype -k shift`, and wtype answers
+`Unknown key 'shift'` — on stderr, which the line discarded. The keysym name is `Shift_L`; `shift` and
+`Shift` are both unknown. So the fix for the un-walked first profile has never run, which is very
+likely why the symptom it describes kept happening.
+
+**The recorded v0.7 numbers are safe.** `gamepad.conf` landed in `0.7.1`, one release *after* the
+`0.7.0` measurement session, so `w` still moved the player when those numbers were taken. Every run
+since would have captured the player standing at spawn and reported it as a thirty-second walk.
+
+**There is no way to make the shell notice if this drifts again** — the coupling is to a config file
+it never reads. What catches it is the check this script already insists on and the reason it refuses
+to OCR its own screenshot: the captured frame carries the position, so a reading at the spawn
+coordinates is not a measurement. That is now written where the walk happens.
+
+### 2026-09-14 — The v0.9 device pass: the numbers hold, and the deploy finally says what draws
+
+Run on the panel after the release, with the device free.
+
+**The renderer check is alive for the first time.** The deploy printed
+`renderer (engine log): INFO[Main]: Irrlicht: V3D 7.1.7.0: Broadcom` — the line that was dead code
+until `debug_log_level = info` was set, because at the engine's default level the log contains no
+driver line at all and the grep silently found nothing while its comment promised confirmation.
+`gpu_preflight` also behaved as rebuilt: the GLX renderer string present and asserted, direct
+rendering asserted, the EGL reading shown separately and explicitly not accepted in its place.
+
+**`debug_log_level = info` costs nothing measurable.** This was the open question the change created,
+since the v0.7 numbers were taken without it. Mid profile, 25 s of real walking, world freshly
+generated: **FPS 29, drawtime 3 ms, dtime jitter 0.1%** — inside v0.7's recorded 30 fps at 2-3 ms. The
+log reached 32 KB, and `run_on_pi.sh` truncates it per launch.
+
+**The three v0.9 fixes were seen, not inferred.** The spawn puts the player on the regolith, not on a
+crown. The terrain past the old measured window is the pinned one — terraces and dry land, no stock
+mountains. Zero `ERROR` lines in the session. The zoom magnifier is still drawn, as predicted and
+recorded: 5.10 adds that button unconditionally, so `zoom_fov = 0` silences what it does and not that
+it is there.

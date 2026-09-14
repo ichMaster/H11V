@@ -120,7 +120,14 @@ specification/ARCHITECTURE.md 'The GPU path'); the deploy output is in $DEPLOY_L
 	# back with the player still at the spawn while later profiles had walked the
 	# full distance — the window is not ready to take injected input the instant
 	# the world finishes loading, and the first key of a session is swallowed.
-	"${SSH[@]}" "$TARGET" "$ENV_PREFIX wtype -k shift" 2>/dev/null
+	#
+	# `Shift_L`, not `shift`. wtype takes X keysym names, and it answers `Unknown
+	# key 'shift'` — on stderr, which this line discarded — for both `shift` and
+	# `Shift`. So from the day it was written until v0.9's device pass, the
+	# throwaway never fired and the swallowed-first-key problem it exists to
+	# absorb was still live in every measurement run's first profile. Found by
+	# reading the output rather than the script: a 25 s walk ended at pos (0,y,0).
+	"${SSH[@]}" "$TARGET" "$ENV_PREFIX wtype -k Shift_L" || die "wtype could not send a keystroke — is it installed on the device?"
 	sleep 2
 
 	# F5 cycles the debug overlay: off -> fps/pos -> profiler -> off. One press.
@@ -129,7 +136,22 @@ specification/ARCHITECTURE.md 'The GPU path'); the deploy output is in $DEPLOY_L
 	sleep 2
 
 	echo "   walking ${WALK}s"
-	# Hold W by pressing it down, waiting, and releasing. A frame rate measured
+	# The key is Up, NOT w, and the difference is the whole measurement.
+	#
+	# tools/device/gamepad.conf sets `keymap_forward = KEY_UP`: on the panel the
+	# D-pad moves you and W does nothing at all. That file landed in v0.7.1, one
+	# release AFTER the v0.7.0 measurement session — so the recorded numbers are
+	# safe, and every run since would have held a key the device does not bind,
+	# captured a frame of the player standing at spawn, and reported it as a
+	# 30-second walk. Confirmed on the device in v0.9's pass: `w` for 30 s left
+	# pos at (0.0, 17.5, 0.0); `Up` for 25 s reached (37.2, 14.5, 24.6).
+	#
+	# This line is coupled to gamepad.conf and there is no way to make the shell
+	# notice if that file moves forward again. The check that would catch it is
+	# the human one this script already insists on: the captured frame shows the
+	# position, so a reading at the spawn coordinates is not a measurement.
+	#
+	# Hold it by pressing down, waiting, and releasing. A frame rate measured
 	# standing still is the easy case and not the one that matters: moving forces
 	# mesh generation, which is where a voxel engine actually spends its time.
 	# ONE invocation, holding the key across a -s sleep. Two separate calls do not
@@ -138,7 +160,7 @@ specification/ARCHITECTURE.md 'The GPU path'); the deploy output is in $DEPLOY_L
 	# The first two attempts both reported pos: (0.0, y, 0.0) after a full-length
 	# "walk", which is what gave it away — the overlay had already proved that key
 	# injection itself reaches the game, since F5 toggled it.
-	"${SSH[@]}" "$TARGET" "$ENV_PREFIX wtype -P w -s $((WALK * 1000)) -p w" 2>/dev/null &
+	"${SSH[@]}" "$TARGET" "$ENV_PREFIX wtype -P Up -s $((WALK * 1000)) -p Up" 2>/dev/null &
 	WALK_PID=$!
 	sleep $((WALK - 3))
 

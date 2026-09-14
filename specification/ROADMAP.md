@@ -256,9 +256,12 @@ flattened RGB re-export of a binary-alpha texture and an out-of-band node resolu
 must report which checker it used; `test_worldgen.sh` keeps passing after the `mgv7_spflags` change
 (the terrain moves, so the numbers are re-recorded rather than the thresholds re-tuned).
 
-**Note on scope.** `codegen/` findings are deliberately excluded from this phase. M15 (the
-alpha-blind seam metric) is deferred to the next art re-delivery; M19 and M20 are recorded as design
-constraints rather than implemented, since the code they constrain does not exist until v2 and v4.
+**Note on scope.** `codegen/` findings are deliberately excluded from this phase. M15 (the alpha-blind
+seam metric) was deferred during the phase and then **closed by the phase-boundary harden sweep**,
+released as `0.9.1` — it had been deferred by a brief rather than by difficulty. M19 and M20 are
+recorded as design constraints rather than implemented, since the code they constrain does not exist
+until v2 and v4, and the `prefab` ↔ `regolith_side` hue pair is held for the next art re-delivery
+because closing it means redrawing a texture.
 
 ---
 

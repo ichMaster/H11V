@@ -22,6 +22,11 @@ lists must be the ids nodes.lua registers. It lives in this gate because this ga
 already parses the game tree and runs for every issue, and because the two lists
 drifted for a whole release with nothing to notice. See check_node_catalogue.
 
+And one is a test of this gate rather than of the art: seam_self_test measures five
+fixtures it builds itself, because the seam metric spent a release unable to report
+a seam at all on the one texture with transparency, and nothing that only looks at
+good art can notice that.
+
 Stdlib only, on purpose: this runs on the pipeline's critical path, and a gate
 that cannot import is a gate that breaks a build. PNG decoding is here rather
 than in Pillow for the same reason.
@@ -273,39 +278,173 @@ class Png:
         sub.chunks = []
         return sub
 
+    @classmethod
+    def synthetic(cls, width, height, pixels):
+        """An 8-bit RGBA image assembled in memory, for seam_self_test's fixtures.
+
+        There is no file behind it, hence path None: nothing that touches .path —
+        check_one's metadata share, the finding messages — is reachable from the
+        self-test, which only measures edges.
+        """
+        img = cls.__new__(cls)
+        img.path, img.width, img.height = None, width, height
+        img.channels, img.depth, img.color, img.trns = 4, 8, 6, False
+        img.pixels = bytes(pixels)
+        img.chunks = []
+        return img
+
+
+# The two guard rails on a seam verdict, in pixdiff's units (0-255 per channel).
+#
+# A wrap difference is allowed to be as large as the texture's own interior
+# variation, times 2.5, because a high-frequency surface legitimately differs
+# across its own boundary — and SEAM_FLOOR keeps that from becoming absurdly
+# strict on a nearly flat one. But the scaling cuts both ways, which is how the
+# one binary-alpha face in TILE_H_ONLY came to have a tiling check that could not
+# fail (review finding M15): h11_bloom is 47% transparent with hard filament-to-void
+# steps throughout, so its interior figure is 67.0 and the unbounded threshold was
+# 167.5 — against a real wrap of 8.4, and above any seam a 32px tile can produce.
+# SEAM_CEILING is the point past which no interior variation excuses a seam.
+#
+# 32 is one eighth of the channel range, and the shipped pack is what sets it. The
+# largest wrap any checked face measures is h11_spire_side's 20.7, and that number
+# is a palette step, not a cut: its darkest edge column is a uniform (0, 136, 135)
+# against (0, 163, 162) opposite it on 26 rows (18.0 each) and (0, 185, 183) on the
+# other 6 (32.3 each) — a thin darker line at the tile boundary, accepted at
+# delivery. The ceiling clears it by 1.55x, and an edge offset a uniform two
+# palette steps (32.3) would cross it. On h11_bloom it catches a filament that
+# reaches one edge and not the other over as few as 4 of 32 rows; the failure M15
+# describes, a crown cut at one edge, measures 117.3 against the shipped 8.4.
+SEAM_FLOOR = 6
+SEAM_CEILING = 32
+
+
+def seam_limit(interior):
+    """The largest wrap difference a tiling face may show, given its interior."""
+    return min(max(interior * 2.5, SEAM_FLOOR), SEAM_CEILING)
+
+
+def pixdiff(p, q):
+    """How different two pixels look, 0-255, with transparency taken seriously.
+
+    Colour is compared ALPHA-PREMULTIPLIED, so whatever hides under a transparent
+    pixel cannot count as image content: two clear pixels are identical whatever
+    their stored RGB, and a matte an exporter leaves behind can neither invent a
+    seam nor conceal one. It concealed one before — bleeding the edge colour into
+    the transparent region is a common export setting, and against an RGB-only
+    diff it makes a cut filament read as zero difference.
+
+    Alpha is then compared on its own and weighted as the whole colour triple
+    rather than as a fourth channel, because "something is drawn here and nothing
+    there" is the most visible discontinuity a tile can have, and the only one
+    whose size does not depend on the art's palette: a filament facing empty space
+    scores at least 85 (255/3) however dark the filament is.
+
+    On a fully opaque texture the alpha term is zero and the premultiply is the
+    identity, so this measures exactly what the RGB-only version measured — checked
+    against every opaque face in TILE_BOTH, TILE_H_ONLY and TILE_NONE, all fourteen
+    unchanged to the digit. h11_bloom is the only texture whose numbers moved.
+    """
+    ap, aq = p[3], q[3]
+    colour = sum(abs(p[c] * ap - q[c] * aq) for c in range(3)) / 255
+    return (colour + abs(ap - aq)) / 3
+
 
 def edge_report(img):
-    """Mean channel difference across the wrap seam vs. between interior rows.
+    """Mean pixel difference across the wrap seam vs. between interior rows.
 
     A texture that tiles has a wrap difference no worse than its own interior
-    variation; a hard seam shows up as a multiple of it.
-
-    KNOWN LIMITATION, deliberately not fixed here (review finding M15, deferred to
-    the next art re-delivery): the difference is RGB only, alpha is ignored, and
-    both fully transparent pixels and the colour hiding under them count as normal
-    image content. On a texture whose transparent area is uniform black — h11_bloom,
-    47% clear — the interior average is dominated by hard black-to-lilac steps that
-    nobody ever sees, so the interior-scaled threshold inflates (measured: 106.8
-    against a real wrap of 5.8) and the check passes whatever the seam does. It is
-    near-vacuous for exactly the one binary-alpha surface in TILE_H_ONLY, and sound
-    for the opaque node faces, which is every other entry. An alpha-aware metric
-    means re-deciding what a seam even is where both sides are transparent, and
-    that is a conversation to have with the art, not a patch to slip in under a
-    gate repair.
+    variation; a hard seam shows up as a multiple of it — bounded by seam_limit,
+    because on a mostly transparent texture the interior figure is large enough to
+    scale the check away entirely. Differences come from pixdiff, so a transparent
+    pixel is compared as the nothing it draws rather than as the colour stored
+    under it. Both halves are review finding M15; seam_self_test holds them.
     """
     w, h, = img.width, img.height
 
     def rowdiff(r1, r2):
-        return sum(abs(img.px(x, r1)[c] - img.px(x, r2)[c]) for x in range(w) for c in range(3)) / (w * 3)
+        return sum(pixdiff(img.px(x, r1), img.px(x, r2)) for x in range(w)) / w
 
     def coldiff(c1, c2):
-        return sum(abs(img.px(c1, y)[c] - img.px(c2, y)[c]) for y in range(h) for c in range(3)) / (h * 3)
+        return sum(pixdiff(img.px(c1, y), img.px(c2, y)) for y in range(h)) / h
 
     wrap_v = rowdiff(h - 1, 0)
     int_v = sum(rowdiff(y, y + 1) for y in range(h - 1)) / max(h - 1, 1)
     wrap_h = coldiff(w - 1, 0)
     int_h = sum(coldiff(x, x + 1) for x in range(w - 1)) / max(w - 1, 1)
     return wrap_v, int_v, wrap_h, int_h
+
+
+def seam_self_test():
+    """Prove the seam metric can still fail, on fixtures built here, not on art.
+
+    This project has no unit-test suite — the gates are the suite — so the fix to a
+    metric ships its regression test inside the gate that uses the metric, and it
+    runs every time the gate does. The alternative was a committed fixture PNG,
+    which would be a texture in the pack that is not in ART-COLONY.md's contract:
+    the delivery audit would report it missing from the order, and check_one would
+    measure it against a table row that does not exist.
+
+    The fixtures are miniature h11_bloom — 16x16, binary alpha, a solid crown over
+    1px filaments — so their interior variation is large (43-117) exactly as the real
+    texture's is (67.0), which is the precondition M15 turns on. Every one of them
+    passed the metric this gate shipped through v0.9: the cut fixture at wrap 112.0
+    against a threshold of 168.0, the same cut with the filament colour bled under
+    the transparent pixels at 0.0, and a cut through dark filaments at 8.5 against
+    12.8. They now measure 175.8, 175.8 and 72.2 against a limit of 32.
+
+    Returns a list of failures, empty when the metric behaves.
+    """
+    CLEAR, CROWN, FIL = (0, 0, 0, 0), (206, 55, 102, 255), (209, 82, 157, 255)
+    BLED = FIL[:3] + (0,)      # the filament colour left under the transparency
+    DARK = (12, 8, 14, 255)    # a filament no brighter than the void it stands in
+
+    def fixture(right_edge, matte, fil=FIL):
+        """Crown, filaments, and a motif that reaches the left edge — and reaches
+        the right one only when right_edge is a filament rather than the matte."""
+        px = bytearray()
+        for y in range(16):
+            for x in range(16):
+                if y < 4:
+                    px += bytes(CROWN)                      # the solid crown
+                elif x == 15:
+                    px += bytes(right_edge)
+                elif x == 0 or x % 3 == 1:
+                    px += bytes(fil)                        # 1px filaments
+                else:
+                    px += bytes(matte)
+        return Png.synthetic(16, 16, px)
+
+    def seam(img):
+        _, _, wrap_h, int_h = edge_report(img)
+        return wrap_h, int_h, wrap_h > seam_limit(int_h)
+
+    fails = []
+    wrap, interior, cut = seam(fixture(FIL, CLEAR))
+    if interior <= SEAM_CEILING:
+        fails.append(f"its own fixture no longer inflates the threshold (interior {interior:.1f} "
+                     f"is under the {SEAM_CEILING} ceiling), so the rest of this test proves nothing")
+    if cut:
+        fails.append(f"a binary-alpha tile whose motif crosses the wrap is reported as a seam "
+                     f"(wrap {wrap:.1f} vs limit {seam_limit(interior):.1f})")
+    # The same tile, with a white matte instead of a black one. Nothing visible
+    # changed, so nothing measured may change either.
+    if seam(fixture(FIL, (255, 255, 255, 0)))[:2] != (wrap, interior):
+        fails.append("the colour stored under a transparent pixel moves the seam figures — "
+                     "the difference is not being alpha-premultiplied")
+    # Three ways to cut the motif at one edge — the failure M15 describes. Each one
+    # survives a different half of this fix being undone, so each pins its own half:
+    # the first is caught only by SEAM_CEILING, the second only because the colour
+    # under a transparent pixel is premultiplied away, the third only because alpha
+    # is in the difference at all.
+    for label, matte, fil in (("a black matte under it", CLEAR, FIL),
+                              ("the filament colour bled under it", BLED, FIL),
+                              ("a filament no brighter than the void", CLEAR, DARK)):
+        wrap, interior, cut = seam(fixture(matte, matte, fil))
+        if not cut:
+            fails.append(f"a motif reaching one edge and not the other passes with {label} "
+                         f"(wrap {wrap:.1f} vs limit {seam_limit(interior):.1f}) — review finding M15")
+    return fails
 
 
 ARCHITECTURE = ROOT / "specification" / "ARCHITECTURE.md"
@@ -547,16 +686,30 @@ def main():
             if img:
                 images[name] = img
 
+    # No seam number below is worth reading until the metric behind it has been
+    # shown capable of producing a failure. It was not, for a whole release.
+    metric_failures = seam_self_test()
+    for failure in metric_failures:
+        findings.append(f"seam metric self-test: {failure}")
+    if args.verbose and not metric_failures:
+        print("  ok  seam metric rejects a cut motif on its own fixtures")
+
     # Tiling.
     for name in TILE_BOTH + TILE_H_ONLY:
         img = images.get(name)
         if not img:
             continue
         wrap_v, int_v, wrap_h, int_h = edge_report(img)
-        if wrap_h > max(int_h * 2.5, 6):
-            findings.append(f"{name}: horizontal seam (wrap {wrap_h:.1f} vs interior {int_h:.1f})")
-        if name in TILE_BOTH and wrap_v > max(int_v * 2.5, 6):
-            findings.append(f"{name}: vertical seam (wrap {wrap_v:.1f} vs interior {int_v:.1f})")
+        # The limit is printed because it is no longer derivable from the two
+        # numbers beside it: past SEAM_CEILING the interior stops raising it, and a
+        # reader who cannot see that reads a failure at wrap 117 / interior 61 as
+        # the gate contradicting itself.
+        if wrap_h > seam_limit(int_h):
+            findings.append(f"{name}: horizontal seam (wrap {wrap_h:.1f} vs interior {int_h:.1f}, "
+                            f"limit {seam_limit(int_h):.1f})")
+        if name in TILE_BOTH and wrap_v > seam_limit(int_v):
+            findings.append(f"{name}: vertical seam (wrap {wrap_v:.1f} vs interior {int_v:.1f}, "
+                            f"limit {seam_limit(int_v):.1f})")
 
     # Animation strips: exact frame count, square frames.
     for name, want_frames in ANIMATED.items():

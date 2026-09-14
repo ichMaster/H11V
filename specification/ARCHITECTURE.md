@@ -48,17 +48,45 @@ to count out itself.
 
 ## Components
 
-- **`h11_world`** — the world layer, and in v0 the only mod. Four small modules loaded in a fixed
-  order by `init.lua`:
-  - `nodes.lua` — one data table, `NODES`, and a loop that registers each entry. Nine registered
-    nodes for eight player-visible block types (`dirt`, `turf`, `stone`, `sand`, `water_source`,
-    `water_flowing`, `trunk`, `leaves`, `crust`). The table, not the loop, is the point: v1's
-    mutation rules are entries over these same ids.
-  - `mapgen.lua` — mapgen selection and parameters, the three structural aliases, one
-    `core.register_biome` for the surface, and tree decorations.
-  - `player.lua` — the hand, the starting inventory, the spawn, the hotbar and crosshair styling,
-    and the HUD flags that hide what v0 does not use. Moves into `h11_hud` when that mod appears.
-  - `init.lua` — `dofile` calls in order: nodes, mapgen, player.
+- **`h11_world`** — the world layer, and in v0 the only mod. `init.lua` loads five modules with
+  `dofile`, in an order that is the dependency order rather than a preference: `nodes.lua`,
+  `mapgen.lua`, `player.lua`, `music.lua`, `turn.lua`. Mapgen cannot point the generator at blocks
+  that do not exist yet, and `player.lua` hands the player blocks `nodes.lua` defined.
+  - `nodes.lua` — one data table, `NODES`, and a loop that registers each entry. **Thirteen**
+    registered ids, listed here in the two halves the art direction demands (ART-COLONY.md §2)
+    rather than in filing order, because a player must be able to tell which half a block belongs to
+    at eight pixels:
+    - **grown**, the planet — `lithic`, `fines`, `regolith`, `drift`, `spire`, `bloom`, `crust`,
+      `melt_source`, `melt_flowing`
+    - **built**, the colony — `hull`, `prefab`, `crate`, `beacon`
+
+    Twelve of the thirteen appear in the creative inventory; `melt_flowing` is the engine's own half
+    of the liquid pair and is flagged out of it. The table, not the loop, is the point: v1's mutation rules
+    are rows over exactly these ids, and `crust` is the one the algorithm leaves behind.
+
+    Beside it, the pre-retheme names are kept resolvable — a `RETIRED` table aliasing the eight v0
+    ids (`turf`, `dirt`, `stone`, `sand`, `trunk`, `leaves`, `water_source`, `water_flowing`) to
+    their replacements. It is not a migration: a world generated before the rename keeps the shape
+    it generated with, and the aliases only buy "the world looks slightly wrong" instead of a field
+    of unknown-node checkerboards. Eight lines, and **droppable** — once no pre-rename world
+    remains, they go.
+
+    Two files describing one catalogue is how the list above came to name nine nodes that no longer
+    existed, for a whole release, with every gate green. So `tools/check_assets.py` compares the ids
+    in those two bullets against the ids `nodes.lua` registers, on every run and in both directions.
+    The parse is a regex over the bullets: keep them free of backticks around anything that is not a
+    node id.
+  - `mapgen.lua` — mapgen selection and parameters, five aliases (the three structural ones v7
+    actually reads, plus `mapgen_lava_source` and `mapgen_cobble`, which the engine asks for during
+    decoration and dungeon placement whether or not a game has either), one `core.register_biome`
+    for the surface — one, technical, replaced by v1.1's three rather than extended — and the
+    spire-growth decoration.
+  - `player.lua` — the scanner that is the hand, the starting inventory, the spawn, the hotbar and
+    crosshair styling, and the HUD flags that hide what v0 does not use. Moves into `h11_hud` when
+    that mod appears.
+  - `music.lua` — one looping track per player, stopped when they leave, off-switchable.
+  - `turn.lua` — yaw on the shoulder buttons, because the engine has no keybinding for the camera
+    and a finger drag is the same gesture as aiming before a tap.
 - **`h11_bots`** (from v2) — the bodies. Split the way the logic is: `body`, `needs`, `intent`,
   `perception`, plus a rule-based StubBrain in Lua so the bots live without a network. Each bot's
   character is its needs weighting, a row in a table.
@@ -80,10 +108,12 @@ to count out itself.
 
 Each of these silently produces a wrong-looking world rather than an error, so they are written down:
 
-- **Tile order is `{top, bottom, right, left, back, front}`** with shorthand fill-in. Turf therefore
-  needs a *triple* — `{turf_top, dirt, turf_side}` — or the green-fringed side texture lands on the
-  block's underside. Trunk takes a pair.
-- **Water is a pair.** `water_source` (`drawtype = "liquid"`) and `water_flowing` (`drawtype =
+- **Tile order is `{top, bottom, right, left, back, front}`** with shorthand fill-in. Regolith
+  therefore needs a *triple* — `{regolith_top, fines, regolith_side}` — or the biofilm-fringed side
+  texture lands on the block's underside, which looks almost right from above and wrong from
+  anywhere else.
+  Spire takes a pair.
+- **Water is a pair.** `melt_source` (`drawtype = "liquid"`) and `melt_flowing` (`drawtype =
   "flowingliquid"`, flow animation on `special_tiles`), cross-referenced via
   `liquid_alternative_source` / `liquid_alternative_flowing`. Without the flowing partner the first
   shoreline the player digs spawns unknown-node checkerboards. A still pond is possible with a
@@ -226,33 +256,40 @@ measurements only count on the device.
 
 ## Assets
 
-Assets are content, not code. The designed pack lives in `specification/art/h11v/`, laid out as an
+Assets are content, not code. The designed pack lives in `specification/art/colony/`, laid out as an
 exact mirror of `games/h11v/`, so installing it is one command and no renaming:
 
 ```bash
-tools/install_assets.sh              # 16x16, the shipping resolution
-tools/install_assets.sh --res=32     # 32x32, the authored size
+tools/install_assets.sh              # 32x32, the authored size and the shipping one
+tools/install_assets.sh --res=16     # 16x16, halved on the way in
 ```
 
-That is the whole install and the whole rollback: it rsyncs the pack in, halves the node textures
-unless `--res=32`, and strips the content-credential metadata every delivered PNG carries — 146 KiB
-across the pack, up to 97% of a single file, crossing the network on every deploy.
+That is the whole install and the whole rollback: it rsyncs the pack in, halves the node textures if
+asked to, and strips the content-credential metadata every delivered PNG carries — 146 KiB across the
+pack, up to 97% of a single file, crossing the network on every deploy.
 
-**Node textures are authored at 32x32 and ship at 16x16** — an aesthetic choice, not a technical one.
-Halving does discard real detail (only 44% of the pack's 2x2 blocks are uniform), and it does **not**
-reduce shimmer at distance (measured: the difference is inside the noise, because nearest-neighbour
-halving moves the same hard edges onto a smaller grid rather than smoothing them). Performance is
-identical: 2-3 ms of a 33 ms budget either way. What remains is that 16x16 is the resolution the
-voxel idiom is written in, and whether 32x32's extra detail reads as texture or as noise at 3.5
-inches is a question for the panel. Keeping the 32x32 set as the master means the decision stays
-reversible. UI art and the first-person hand are **not** scaled — they are sized in screen pixels or
-extruded into a mesh.
+**Node textures are authored at 32x32 and ship at 32x32.** The halving flag stays because the trial
+was real: 16x16 was built, installed, looked at on the panel and rolled back the same day
+(`docs/decisions.md`, "32x32 stands. The 16x16 trial was run on the device and reverted"). It cost one
+command each way precisely because the delivery of record is never modified — and it retired two
+plausible arguments permanently, which is why the reasoning is kept here rather than deleted with the
+decision. Halving discards real detail (only 44% of the pack's 2x2 blocks are uniform), and it does
+**not** reduce shimmer at distance (measured: the difference is inside the noise, because
+nearest-neighbour halving moves the same hard edges onto a smaller grid rather than smoothing them).
+Performance is identical: 2-3 ms of a 33 ms budget either way. So nothing measurable argued for 16x16,
+and the question it was meant to settle — whether 32x32's extra detail reads as texture or as noise at
+3.5 inches — was answered by looking at both on the panel rather than by argument. Both arguments are
+the kind that get re-proposed from intuition every few months; this paragraph is the answer to them.
+UI art and the first-person hand are **not** scaled — they are sized in screen pixels or extruded into
+a mesh.
 
 `tools/check_assets.py` detects the installed resolution rather than being told it, so the gate
 follows the choice automatically and a half-finished install (node textures disagreeing with each
 other) is reported as such.
 
-Code references the filenames in [ART.md](ART.md) §5 and nothing else. The pack under
+Code references the filenames in [ART-COLONY.md](ART-COLONY.md) §6 and nothing else. `ART.md` §5 is
+the same kind of contract for the retired v0 pack and is not what ships; a gate pointed at the old
+brief is how `--pack` came to audit the wrong delivery for a whole release. The pack under
 `specification/` is the delivery of record and is never edited in place: a re-delivery is a drop-in
 replacement, and the game tree stays reproducible from the specification plus those two commands.
 `tools/check_assets.py` enforces the whole contract and treats leftover metadata as a hard failure in
@@ -261,7 +298,8 @@ the game tree and a tolerated note in the pack.
 ## Configuration layering
 
 `tools/device/minetest.conf` holds everything shared — fullscreen 640×480, `video_driver`,
-`touch_controls` with the crosshair interaction style, scaling, font. The three `device-*.conf` files
+`touch_controls` with `touch_use_crosshair` (5.10's name for it), the two scalings and the font
+size. The three `device-*.conf` files
 hold only the deltas that define a graphics profile. `deploy_to_term35.sh` concatenates base + chosen
 profile into the single config the device runs with, and `run_local.sh` does the same on the Mac with
 fullscreen swapped for a window. One source of truth for shared settings, no drift between profiles,
@@ -280,10 +318,14 @@ tools/run_local.sh                        # Mac: a 640x480 window, walk, dig, pl
 tools/deploy_to_term35.sh --profile=mid   # device: it runs, on the GPU, at a measured frame rate
 ```
 
-The first two run for **every** issue. The third is required whenever `games/h11v/**/textures/`,
-`menu/` or the asset pack changed. The fourth whenever anything visible changed. The fifth whenever
-the phase's Definition of Done names a frame-rate budget, or the change adds per-tick or per-frame
-work — and its numbers only count with the GPU preflight green.
+The first two run for **every** issue, and so does the third: `check_assets.py` is required whenever
+`games/h11v/**/textures/`, `menu/` or the asset pack changed, *and* it now carries the node-catalogue
+contract between `nodes.lua` and §Components above, which no art change is involved in. It costs about
+a second, so the rule is simply to run it — a gate that only fires when someone remembers which kind
+of change they made is how §Components spent a release describing nodes that did not exist. The fourth
+runs whenever anything visible changed. The fifth whenever the phase's Definition of Done names a
+frame-rate budget, or the change adds per-tick or per-frame work — and its numbers only count with the
+GPU preflight green.
 
 A phase's DoD names the assertions it adds; they go into `test_worldgen.sh` or `check_assets.py`,
 never into a new framework.
@@ -300,7 +342,7 @@ that line, applies the phase's thresholds and exits 0 or 1. The game itself cont
 
 ```
 games/h11v/            the Luanti game — game.conf, menu/, screenshot.png, mods/
-  mods/h11_world/      nodes, mapgen, player (v0); biomes and the mutation cycle (v1)
+  mods/h11_world/      nodes, mapgen, player, music, turn (v0); biomes and the mutation cycle (v1)
   mods/h11_bots/       bodies + StubBrain (v2)
   mods/h11_build/      part catalogue, plan ops, placed-part registry, undo (v2)
     schematics/        the authored .mts parts — the catalogue's content
@@ -308,8 +350,9 @@ games/h11v/            the Luanti game — game.conf, menu/, screenshot.png, mod
 brain/                 Python brain service for the LAN machine (v3)
 tools/                 device profiles, deploy, run, and the acceptance runners
   device/              minetest.conf + device-{low,mid,high}.conf
-specification/         VISION, ARCHITECTURE, ROADMAP, SDLC, ART, implementation/
-  art/                 canonical references (ref-*.png) and the delivered pack (h11v/)
+specification/         VISION, ARCHITECTURE, ROADMAP, SDLC, ART-COLONY, ART, implementation/
+  art/                 canonical references (space/) and the shipping pack (colony/); the v0
+                       references (ref-*.png) and pack (h11v/) are kept as that version's record
 codegen/               pipeline instrumentation — subject-independent, see SDLC.md
 docs/                  decisions.md and device measurements
 ```

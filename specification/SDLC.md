@@ -28,8 +28,17 @@ Two orchestrators drive it; do not mix them within one version.
 
 | | |
 |---|---|
-| **`/ship-phase`** | the full pipeline over one or more roadmap selectors — `v0`, `v1.2`, `v0,v1-v2`. Adds missing prerequisites, sorts into dependency order, skips what is released, and runs the loop above. Gated: stops on failure and surfaces real decisions. |
-| **`/ship-solution`** | the same work driven from a single issues file rather than the roadmap. For a bounded piece of work that is not a roadmap phase — a review sweep, a migration, a spike. |
+| **`/ship-phase`** | the full pipeline over one or more roadmap selectors — `v0`, `v1.2`, `v0,v1-v2`. Adds missing prerequisites, sorts into dependency order, skips what is released, and runs the loop above, reporting each phase to chat. Gated: stops on failure and surfaces real decisions. |
+| **`/ship-solution`** | the same arc, offline. Also **roadmap-driven** — with no selector it ships *every* version that has an issues file — but it skips generation and GitHub and executes each version straight from its `vA.B-issues.md` with `execute-issues-file`. Otherwise identical: prerequisites filled in, roadmap order, reconcile → execute → review-and-fix → **release a real tag and push**, harden at each phase boundary, and one detailed timed report at the end instead of one per phase. It cannot generate a missing issues file, so a prerequisite with neither a tag nor a file is a hard stop rather than a skip. |
+
+Both release. Neither is the route for **bounded work that is not a roadmap phase**, and that route has
+no orchestrator on purpose: a review sweep is `/review-and-fix-issues` (with no argument it reviews the
+working tree) or `/harden-findings`, which sweeps the existing reports and can be told to cut the patch
+release itself; a one-off that already has an issues file is `/execute-issues-file`. Work big enough to
+want the whole loop earns a **roadmap phase** instead — which is exactly how `v0.9` came to exist,
+added to [ROADMAP.md](ROADMAP.md) after v0 was already written and released. The failure this
+paragraph prevents is small and expensive: reaching for `/ship-solution` to run a migration starts a
+releasing pipeline over the entire roadmap.
 
 The eight sub-skills are usable on their own; the orchestrators exist so a phase does not depend on
 remembering the order.
@@ -47,8 +56,10 @@ tools/run_local.sh                        # Mac: a 640x480 window, walk, dig, pl
 tools/deploy_to_term35.sh --profile=mid   # device: it runs, on the GPU, at a measured frame rate
 ```
 
-The first two run for every issue. The third is required whenever textures, menu art or the asset
-pack changed, the fourth whenever anything visible changed, and the fifth whenever the phase's DoD
+The first three run for every issue: the first two always did, and `check_assets.py` joined them when
+it took on the node-catalogue contract between `nodes.lua` and `ARCHITECTURE.md` §Components — a
+check no art change is involved in, in a gate that used to fire only when art changed. It costs about
+a second. The fourth runs whenever anything visible changed, and the fifth whenever the phase's DoD
 names a frame-rate budget or the change adds per-tick or per-frame work. A phase's DoD names the
 assertions it adds; they go into `test_worldgen.sh` or `check_assets.py` — never into a new
 framework.

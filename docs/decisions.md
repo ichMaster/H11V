@@ -761,3 +761,23 @@ groves, terrain visible between them, and the crowns still the loudest thing in 
 **Neither of these was findable from the gates.** Every acceptance check was green while the world was
 wrong, and the only reason either is known is a screenshot pulled off the device with `grim`. The
 gates prove the world contains what it should; they have no opinion about whether it can be looked at.
+
+### 2026-09-14 — check_assets.py is an every-issue gate now, because it carries a contract
+
+`ARCHITECTURE.md` §Components and `nodes.lua` drifted apart for a whole phase: the document went on
+listing nine nodes under the retired v0 ids while the code registered thirteen colony ones, and
+nothing noticed — because the document is prose and nothing reads prose.
+
+So the assertion is now code. `check_assets.py` parses the node ids out of §Components and out of
+`nodes.lua` and compares the sets, reporting a finding in either direction. It was the right home for
+it (the alternative, `check_lua.sh`, is shell and would need a Lua parser for a three-line set
+difference) — but only once it runs every time, and it was documented as art-only, so exactly the
+change class that renames nodes could skip it.
+
+**Measured before promoting it: 1.02 s.** Four of the five pipeline skills already ran it
+unconditionally, so this aligns the written policy with what was happening anyway.
+
+The coupling this introduces is stated in both the document and the parser: inside §Components'
+**grown** and **built** bullets, nothing is in backticks except a node id. That is a small price for
+a contract that fails red instead of rotting quietly, and the parser goes red — not blind — if the
+heading or the bullets are renamed.

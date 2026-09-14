@@ -17,6 +17,11 @@ tables below are the colony names, and ART.md survives only as the record of wha
 v0 shipped. A docstring pointing at the old brief is how the --pack mode came to
 audit the retired pack for a whole release.
 
+One check here is not about art at all: the node ids ARCHITECTURE.md §Components
+lists must be the ids nodes.lua registers. It lives in this gate because this gate
+already parses the game tree and runs for every issue, and because the two lists
+drifted for a whole release with nothing to notice. See check_node_catalogue.
+
 Stdlib only, on purpose: this runs on the pipeline's critical path, and a gate
 that cannot import is a gate that breaks a build. PNG decoding is here rather
 than in Pillow for the same reason.
@@ -302,6 +307,107 @@ def edge_report(img):
     return wrap_v, int_v, wrap_h, int_h
 
 
+ARCHITECTURE = ROOT / "specification" / "ARCHITECTURE.md"
+NODES_LUA = GAME / "mods" / "h11_world" / "nodes.lua"
+
+# The two halves ARCHITECTURE.md §Components lists the block catalogue in, and the
+# reason the list is parsed rather than copied here: a third copy of the same fact
+# is a third thing to drift.
+COMPONENT_HALVES = ("grown", "built")
+
+
+def architecture_node_ids():
+    """The node ids ARCHITECTURE.md §Components claims exist.
+
+    Read out of the **grown** and **built** bullets of that section and nowhere
+    else. That puts one requirement on the document, and it says so where it lists
+    them: inside those two bullets, nothing is in backticks except a node id. The
+    bullet is one wrapped paragraph and the match stops at the next bullet or the
+    next blank line, which is what keeps the RETIRED alias names in the paragraph
+    below it out of the comparison — those are old spellings on purpose.
+
+    Returns (ids, error) with exactly one of the two set.
+    """
+    try:
+        text = ARCHITECTURE.read_text()
+    except OSError as exc:                                     # noqa: BLE001
+        return None, f"cannot read specification/ARCHITECTURE.md ({exc})"
+    section = re.search(r"^## Components$(.*?)^## ", text, re.S | re.M)
+    if not section:
+        return None, ("specification/ARCHITECTURE.md has no '## Components' section, so the node "
+                      "catalogue has nothing to be checked against")
+    ids = set()
+    for half in COMPONENT_HALVES:
+        bullet = re.search(r"\*\*" + half + r"\*\*(.*?)(?=\n[ \t]*\n|\n[ \t]*[-*] |\Z)",
+                           section.group(1), re.S)
+        if not bullet:
+            return None, (f"specification/ARCHITECTURE.md §Components has no '**{half}**' bullet — "
+                          "the documented block catalogue cannot be compared with nodes.lua")
+        found = set(re.findall(r"`([a-z][a-z0-9_]*)`", bullet.group(1)))
+        if not found:
+            return None, (f"specification/ARCHITECTURE.md §Components '**{half}**' bullet names no "
+                          "node ids in backticks")
+        ids |= found
+    return ids, None
+
+
+def registered_node_ids():
+    """The ids nodes.lua actually registers: the `id = "..."` rows of NODES.
+
+    The retired-alias table is deliberately not matched — its rows read
+    `turf = "regolith"`, not `id = "turf"`. An alias is a courtesy to a world
+    generated before the retheme, not a block anything new may be written against.
+    """
+    try:
+        src = NODES_LUA.read_text()
+    except OSError as exc:                                     # noqa: BLE001
+        return None, f"cannot read {NODES_LUA.relative_to(ROOT)} ({exc})"
+    ids = set(re.findall(r'^\s*id = "([a-z0-9_]+)",?\s*$', src, re.M))
+    if not ids:
+        return None, (f"{NODES_LUA.relative_to(ROOT)} registers no ids this gate can see — the "
+                      "NODES row shape changed and this check went blind rather than red")
+    return ids, None
+
+
+def check_node_catalogue(findings, verbose):
+    """ARCHITECTURE.md §Components and nodes.lua must name the same blocks.
+
+    Both directions matter and they fail differently. An id in the code and not in
+    the document is an undocumented block. An id in the document and not in the
+    code is worse: §Components is the list that same document tells a v1
+    issue-writer the mutation rules "are rows over", so a phantom id becomes a rule
+    that silently matches nothing.
+
+    This exists because the two drifted for a whole release with every gate green —
+    the document still described nine nodes under names the colony retheme had
+    renamed away (review finding H7). Nothing checked a document against code, so
+    nothing could notice. It is ROOT-relative rather than base-relative on purpose:
+    the contract is between two committed files, it holds in --pack mode too, and
+    choosing a mode must not be a way to skip it.
+    """
+    doc_ids, err = architecture_node_ids()
+    if err:
+        findings.append(err)
+        return
+    code_ids, err = registered_node_ids()
+    if err:
+        findings.append(err)
+        return
+    undocumented = sorted(code_ids - doc_ids)
+    phantom = sorted(doc_ids - code_ids)
+    if undocumented:
+        findings.append(
+            f"ARCHITECTURE.md §Components does not list {', '.join(undocumented)}: nodes.lua "
+            f"registers {len(code_ids)} ids, the document names {len(doc_ids)} — and the document is "
+            "what v1's mutation rules get written against")
+    if phantom:
+        findings.append(
+            f"ARCHITECTURE.md §Components lists {', '.join(phantom)}, which nodes.lua does not "
+            "register — a mutation rule addressing that id would match no block in the world")
+    if verbose and not undocumented and not phantom:
+        print(f"  ok  ARCHITECTURE.md §Components and nodes.lua agree on {len(code_ids)} node ids")
+
+
 def check_one(path, spec, findings, warnings, verbose, scalable=False):
     name = path.name
     want_w, want_h, regime, max_colours = spec
@@ -491,6 +597,10 @@ def main():
             findings.append(f"{name}: named in h11_world Lua but not installed in {TEX}/")
         if args.verbose:
             print(f"  ok  {len(named)} texture reference(s) in Lua all resolve")
+
+    # And the other half of the same idea: the code and the ARCHITECTURE must agree
+    # on which blocks exist, not only the code and the pack on which files exist.
+    check_node_catalogue(findings, args.verbose)
 
     # The hotbar must be eight identical cells so a 6-slot crop stays lossless.
     bar = images.get("h11_hotbar.png")

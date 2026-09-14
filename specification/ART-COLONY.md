@@ -119,20 +119,37 @@ all** — they are off in every profile, and that is a frame-rate decision, not 
 So the colours are yours, and these six rules are not.
 
 **Rule 1 — the value ladder.** The opaque materials share one ladder, and **neighbours sit at least 8
-L\* apart**. This order is chosen so the ground you walk on sits in the middle and the cliffs and
-dunes read brighter against it:
+L\* apart**. The order is chosen so the ground you walk on sits in the middle, the planet descends
+from it, and the colony takes both ends:
 
 ```
-brightest   drift          wind dust catches the light
-            lithic         bedrock, cliff faces
+brightest   hull           worn plating, entry-scorched
+            drift          wind dust catches the light
             regolith       the walkable surface
-            hull           worn plating, entry-scorched
             prefab         habitat panels
-darkest     fines          subsoil
+            fines          subsoil
+darkest     lithic         bedrock, cliff faces
 ```
+
+Three things are bought by that order. The walkable surface sits in the middle, so terrain is read
+against it in both directions. The planet then descends from that surface — dunes above it, subsoil
+and bedrock below — which makes a cut terrace a bright top over a dark face, so Rule 5 is *expressed*
+by the ladder instead of fought by it. And the colony owns both extremes: `hull` is the brightest
+thing on the planet because it is the thing that came from off it, and a lander has to be findable at
+100 nodes, while `prefab` sits below the walkable surface so a built panel reads as inset rather than
+as more ground.
+
+This is not the order the brief first prescribed. §4's sketch put bedrock second from the top so that
+cliffs would read *brighter* than the ground; the delivery inverted it, and the inversion was accepted
+as the better reading — §11 measures it and `docs/decisions.md` dates the decision.
 
 Eight points is not arbitrary: it is roughly the smallest lightness step that still separates two
 flat 8-pixel patches under the engine's own light modulation.
+
+A material added in a later biome takes a rung in this ladder; it does not open a new one between two
+existing rungs. Measured on the shipped pack, the six rungs span 44.8 L\* in steps averaging 8.96 —
+within a point of the floor everywhere. There is no room to insert one, and an author who tries will
+break a neighbour instead of the rule they were reading.
 
 **Rule 2 — hue does the work when value cannot.** Any two materials closer than 8 L\* must be **at
 least 60° apart in hue**. Spread the ladder around the wheel rather than stacking one family: a warm
@@ -169,6 +186,15 @@ helps, but it is not enough on its own and it must not be relied on.
 beacons, and everything else is multiplied toward black. The value ladder compresses; the hue spread
 from Rule 2 is what still separates regolith from lithic when it does.
 
+*Compresses* turned out to be too gentle a word for it. Multiply an encoded colour by 0.3 — which is
+what the engine does with vertex light and a texel — and white itself lands at L\* 32.5, so above the
+shipped ladder's floor there is room for three rungs of 8 L\*, not six. **No six-material ladder
+passes Rule 6, in this pack or any other**, which is worth knowing before anyone tries to widen one to
+fix a night problem. Hue does survive the multiply, but only as an angle: no material's hue moves more
+than 2.7°, while the chroma carrying it falls to a third. So Rule 6 is a check on the *light* rather
+than on the palette, and the answer to a dark planet is more emitting blocks — §11 measures both
+halves of this.
+
 ### How to verify, before delivering
 
 Two checks, both cheap, both worth more than any amount of looking at the tiles at full size:
@@ -196,6 +222,10 @@ this fiction. Take it, ignore it, or use it as a floor to beat:
 It is cooler and less creamy than the references, which is the honest cost of losing ray-traced
 shadows. If you can hold the reference's warm bone light *and* the ladder, that is a better answer than
 this one — the rules are the requirement, the hexes never were.
+
+Nor is the **order** in that table, which predates the delivery and puts bedrock near the top. What it
+demonstrates is that six rungs of 8 L\* with a hue spread exist at all; Rule 1's sequence above is the
+one to build to, and the shipped pack in §11 is the worked example that actually passes.
 
 ---
 
@@ -250,7 +280,8 @@ Deviations here fail **silently** — wrong faces, alpha fringes, checkerboards 
 | `h11_regolith_top.png` | 32x32 | the world's surface: bone dust, fine crazing, a sparse cyan biofilm bloom and two or three tiny crystal specks. **Sparse** — this is not a lawn |
 | `h11_regolith_side.png` | 32x32 | fines with the biofilm crust fringe along the top edge only |
 | `h11_fines.png` | 32x32 | violet-grey compacted subsoil, a few embedded pebbles. Also the bottom face of regolith |
-| `h11_lithic.png` | 32x32 | bedrock: ivory plates with fracture lines, flatter and brighter than regolith |
+| `h11_lithic.png` | 32x32 | bedrock flank: cool grey plates with open angular fractures, flatter than regolith and the **darkest** rung of the ladder — a cut terrace is a pale top over a dark face |
+| `h11_lithic_top.png` | 32x32 | bedrock's top face, and its underside: the same fracture language as the flank, brighter than it. Wired by `nodes.lua` and required by `check_assets.py`, so it is ordered, not an extra |
 | `h11_drift.png` | 32x32 | pale wind-drift dust, soft ripple, no pebbles (it falls when unsupported) |
 | `h11_spire_top.png` | 32x32 | cut face of a crystal stalk: concentric growth rings, translucent core, brightest at the centre |
 | `h11_spire_side.png` | 32x32 | stalk flank: vertical facets, lilac, a faint internal vertical light line |
@@ -356,10 +387,15 @@ is a test fixture, not a save worth keeping.
 
 ## 11. Delivery audit — 14 September 2026
 
-Accepted after two revisions. 44 files: the 21 ordered textures, the 6 optional glyphs, the 3 menu
-images, `screenshot.png`, and 13 unordered extras that are welcome
+Accepted after two revisions. 44 files: the 22 ordered textures, the 6 optional glyphs, the 3 menu
+images, `screenshot.png`, and 12 unordered extras that are welcome
 (`h11_creep`, `h11_needle`, `h11_lattice`, `h11_pod`, `h11_frond`, `h11_tuft`, `h11_shelf`,
-`h11_stem`, `h11_lithic_top`, `h11_lava`, and three `_alt` variants).
+`h11_stem`, `h11_lava`, and three `_alt` variants).
+
+`h11_lithic_top` was first counted among those extras and is not one: `nodes.lua` wires it as
+bedrock's top face and `check_assets.py` fails without it. §6.1 now orders it. A face the game draws
+on every exposed bedrock block was, on paper, a gift — which is how it went a release without being
+measured under Rule 5.
 
 Verified programmatically against §5.1 and §4.1, not by eye alone.
 
@@ -367,17 +403,125 @@ Verified programmatically against §5.1 and §4.1, not by eye alone.
 | --- | --- |
 | Filenames and sizes vs §6 | all match, including the optional glyph set |
 | Alpha regimes vs §5.1 | exactly as specified — terrain opaque, bloom/scanner/crosshair/glyphs binary, meltwater partial |
-| Rule 1, the value ladder | **holds at every step**: hull 86.8 → drift 77.9 → regolith 69.7 → prefab 58.7 → fines 50.4 → lithic 42.0, steps of 8.8 · 8.2 · 11.1 · 8.3 · 8.4 |
-| Rule 5, top brighter than side | 3 of 3 — regolith +16.2, spire +4.1, crate +10.0 |
-| Rule 2, hue spread | 7 formal collisions, **none blocking** — see below |
+| Rule 1, the value ladder | **every step holds; the order does not**: hull 86.8 → drift 77.9 → regolith 69.7 → prefab 58.7 → fines 50.4 → lithic 42.0, steps of 8.8 · 8.2 · 11.1 · 8.3 · 8.4 — all ≥ 8, and none of them in the order §4.1 first prescribed. The deviation is accepted, and recorded below |
+| Rule 5, top brighter than side | **4 of 4 pass the arithmetic, one of them by 2.9** — regolith +16.2, crate +10.0, spire +4.1, lithic +2.9. Four pairs, not three: `h11_lithic_top` is bedrock's top face. The lithic pair is accepted for a reason, not because it passes; see below |
+| Rule 2, hue spread | of the 105 pairs the 15 measurable node faces make (meltwater has no fully opaque pixel to average), **24 sit inside 8 L\*** — which is what makes Rule 2 apply to them — and **7 of those are also inside 60° of hue**, so they are failures needing adjudication. Six are closed below, one is open |
+| Rule 6, at 30% brightness | **no pair in the catalogue holds 8 L\* dimmed, and none could** — the ladder is not what separates this world at night; see below |
 | PNG metadata | `caBX` content-credential chunks present; `tools/strip_png_metadata.py` removes them at install, as it did for the v0 pack |
 
-**The seven collisions, each checked rather than counted.** Three are solved by chroma
-(`regolith_top`↔`spire_side`/`spire_top` sit at the same lightness but at ΔC 26–30 — pale ground
-against vivid crystal; `lithic`↔`bloom` at ΔC 51). One is solved by the engine: `lithic`↔`beacon` is
-a real match on paper, but the beacon is a `light_source` and is therefore physically brighter than
-anything near it. Two are the two faces of one block. One — `fines`↔`regolith_side` — is required by
-the brief itself, since the side face *is* fines with a fringe.
+All of it re-measured on 14.09.2026 against the installed tree, CIELAB means over the fully opaque
+pixels of each texture, taken on the encoded bytes — which is what a downscale to one pixel actually
+does, and §4.1's own verification step.
+
+### The ladder order
+
+Rule 1 as first written put `lithic` second from the top and `hull` fourth, so that cliffs and dunes
+would read brighter than the ground they stand in. The delivery inverted both ends: bedrock is the
+darkest rung and the ship's plating the brightest. **The steps were checked and the order was not**,
+and for a release this table said "holds at every step" about a ladder that held every step of a
+different ladder.
+
+The shipped order is the better one and it is now what §4.1 prescribes. A dark bedrock rung is what
+makes a terrace read as a step rather than a stripe — the bright top face over a dark cut face is
+Rule 5 stated in the ladder — and a hull brighter than everything the planet has is how the lander
+stays findable at 100 nodes. What the inversion cost was not legibility but authority: a v1.1 biome
+author placing new materials by the binding rule would have put them on the wrong bands, in a document
+that read as verified.
+
+### Every Rule-2 failure, with its adjudication
+
+A pair inside 8 L\* is not yet a problem — it is where Rule 2 starts applying. The failures are the
+pairs also inside 60° of hue, and there are **seven** of those in the shipped catalogue. They are not
+the seven this audit first listed: two of those (`lithic`↔`bloom` at Δhue 106°, `lithic`↔`beacon` at
+Δhue 154°) clear the hue requirement outright and were never failures, and two real failures were
+absent from the count.
+
+| pair | ΔL\* | Δhue | ΔC | verdict |
+| --- | --- | --- | --- | --- |
+| `regolith_top` ↔ `spire_side` | 0.1 | 5.6° | 30.4 | closed — chroma: pale ground against vivid crystal |
+| `lithic` ↔ `lithic_top` | 2.9 | 1.4° | 0.3 | closed — two faces of one block. Also the pair Rule 5 never got to; see below |
+| `fines` ↔ `regolith_side` | 3.2 | 5.2° | 1.8 | closed — required by the brief: the side face *is* fines with a fringe |
+| `regolith_top` ↔ `spire_top` | 4.0 | 5.4° | 26.3 | closed — chroma, as above |
+| `spire_side` ↔ `spire_top` | 4.1 | 0.2° | 4.1 | closed — two faces of one block |
+| `prefab` ↔ `regolith_side` | 5.1 | 49.9° | 5.3 | **open** — no lever at all, at the commonest build boundary |
+| `fines` ↔ `lithic_top` | 5.5 | 41.1° | 8.3 | accepted, reason below |
+
+Two pairs that are *not* failures stay on the record, because anyone who measures will find them
+inside 8 L\* and ask: `lithic`↔`bloom` is held apart by ΔC 53.7, and `lithic`↔`beacon` by the engine —
+the beacon is a `light_source` and is therefore physically brighter than anything near it.
+
+**`prefab` ↔ `regolith_side` is the one open failure, and it is in the worst place to have one.** It
+fails Rule 1's 8 L\* and Rule 2's 60°, and it has none of the escapes the six closed pairs have: not
+two faces of one block, not a light source, not asked for by the brief, and — unlike the pairs Rule 2's
+chroma clause rescues at ΔC 26–30 — with no chroma to lean on, 6.3 against 11.6. At 30% it is ΔL\* 1.9
+and ΔC 1.9, the same answer with the numbers made small. And it is the built-against-terrace boundary:
+a prefab wall standing on an exposed regolith cliff face is the single most common thing a player will
+build. What separates them today is Rule 4 alone — prefab's one strong vertical seam against the side
+face's speckled fringe — which reads at 10–20 pixels and is gone at 5. That is a weaker guarantee than
+any other pair in this catalogue has, so it is **open for the next re-delivery** rather than filed as
+fine.
+
+The cheapest lever is measured and it is lightness, not hue: **lift `prefab` 2.9 L\*, 58.7 → 61.6.**
+That restores the 8 L\* against the terrace face exactly, keeps 8.2 to `regolith_top` and 8.1 to
+`spire_side`, and the only pairs it leaves inside 8 L\* are `crate_top` (ΔL\* 2.5) and `crate_side`
+(ΔL\* 7.5), both at Δhue 169° — hue-clear, no new failure. Hue is the lever to avoid, in both
+directions: warm enough to clear the planet's violets lands `prefab` in the crate's family (Δhue 169°
+today at ΔL\* 4.6 — collapse the hue and that becomes the new failure), and cool enough lands it in
+cyan, which this delivery reserves for the crystals and for H11.
+
+**`fines` ↔ `lithic_top` is accepted, with the reason stated.** A failure on the same terms — ΔL\* 5.5,
+Δhue 41.1°, ΔC 8.3 — and a far cheaper one. Subsoil and the top face of bedrock are two layers of one
+column: mapgen lays 1 regolith over 2 fines over bedrock, so a player meets this pair standing in a dug
+shaft with fines walls at arm's length, and essentially never across open ground. Rule 2 exists for the
+5-pixel far field; at 3 nodes the full 32×32 and Rule 4's fracture language both still read. Accepted,
+and recorded rather than absent.
+
+### Rule 5 has four pairs, not three
+
+`nodes.lua` wires `h11_lithic_top.png` as bedrock's top face and its underside. Measured, that face is
+**+2.9 L\*** over the flank — 44.9 against 42.0 — and this audit called the crate's original **+2.6**
+"technically passing, visually thin" and had it redrawn to +10.0. The standard the pack was held to is
+on the record, and this pair is under it.
+
+It was missed because it had already been dismissed: the same pair is one of the two "two faces of one
+block" entries in the Rule-2 list above. Waved through under one rule, it never reached the other. That
+is the shape of the whole finding — a pair can be correctly closed against one rule and never tested
+against another, and a table of per-rule verdicts hides it.
+
+**Accepted, and the obvious fix refused on measurement.** Brightening `lithic_top` by the 5 L\* that
+would clear the crate's bar puts it at 49.9 — **0.5 L\* from `fines` at 50.4**, and 3.7 from
+`regolith_side`, at Δhue 41° and 36°. That trades a thin top/side step for two live Rule-2 failures
+between materials that share a column. The whole gap `lithic_top` has to play in is the 8.4 L\* between
+the ladder's bottom two rungs and it is sitting in the middle of it; the headroom is not there. The
+reason for accepting is not only that the arithmetic is stuck: bedrock is met as a cliff wall and as a
+floor underfoot, not as a plateau read across a valley, and the plateau case is what Rule 5 is for —
+which is why `regolith_top`, the material that *is* the plateau, carries +16.2. If it is ever worth
+fixing, the lever is chroma on the top face (ΔC is 0.3 today) or a darker flank, never a brighter top.
+
+### Rule 6, measured for the first time
+
+Modelled the way the engine models it — the encoded colour multiplied by 0.3 — the catalogue at night
+is this: **66 of 105 material pairs sit inside 8 L\***, against 24 at full brightness, and the ladder's
+own steps fall from 8.8 · 8.2 · 11.1 · 8.3 · 8.4 to 3.30 · 3.01 · 4.07 · 3.03 · 3.06. Nothing in the
+pack holds 8 L\* dimmed.
+
+That is not a fault in the delivery. White itself only reaches L\* 32.5 at 30%, so above bedrock's
+dimmed 11.1 there is room for three rungs of 8, not six — **no six-material ladder can pass Rule 6**.
+Which is why this table carried no Rule 6 row for a release: there was no arithmetic that could pass,
+and a row with nothing in it is easier to leave out than to explain. Leaving it out was still wrong,
+because the rule is binding and a missing row reads as a rule nobody had to satisfy.
+
+Hue survives the multiply: no material's angle moves more than 2.7°, and the muted planet materials
+move under 0.5°. Its chroma does not — `prefab` falls from C\* 6.3 to 2.34, `lithic` from 4.9 to 1.79 —
+so the hue Rule 2 banks on is, at 30%, a fact about the file rather than about the screen. 24 pairs are
+inside both 8 L\* and 60° once dimmed, and two of them are the ladder's own ends: `hull`↔`drift` at
+Δhue 4.3°, which was never separated by anything but value, and `fines`↔`lithic` at 42.6°.
+
+**So Rule 6 audits the lighting, not the pack** — and the answer already shipped. `crust` is
+`light_source` 12 and `beacon` is 14, and `nodes.lua` records reaching the same conclusion from the
+other end: night on the device could not be fixed by a gamma or light-curve setting, so it was fixed
+with blocks that emit. A 30% surface is one nobody is standing near. Rule 6's worth is that it says so
+in numbers rather than leaving it to be found on the panel.
 
 ### What the two revisions changed, and what that says
 
@@ -400,7 +544,20 @@ ladder was nearly correct in the first delivery while the ground was still recog
 dirt, because a lightness ladder cannot see what a texture depicts. Both checks are needed, and the
 cheap one is not the sufficient one.
 
-**One deviation from the brief was accepted as better than the brief.** §4's sketch spent cyan on the
-terrain. The delivery reserves cyan entirely for the crystals and for H11, and gives the planet a
-warm-bone-to-violet range instead. That is a stronger reading of the fiction — the colour of the
-algorithm should not also be the colour of the ground — and it is now canon.
+**Two deviations from the brief were accepted as better than the brief.**
+
+The first: §4's sketch spent cyan on the terrain. The delivery reserves cyan entirely for the crystals
+and for H11, and gives the planet a warm-bone-to-violet range instead. That is a stronger reading of
+the fiction — the colour of the algorithm should not also be the colour of the ground — and it is now
+canon.
+
+The second: Rule 1's ladder **order**. The brief ran drift > lithic > regolith > hull > prefab > fines
+so that cliffs would read brighter than the ground; the delivery runs hull 86.8 > drift 77.9 >
+regolith 69.7 > prefab 58.7 > fines 50.4 > lithic 42.0, with bedrock at the floor and the plating at
+the top. Accepted for the reasons under *the ladder order* above, and §4.1 now prescribes the shipped
+order rather than the sketched one. **The two deviations are not the same kind of thing, and the
+difference is the lesson.** The cyan one was argued and recorded when it happened. The ladder one was
+never noticed: the audit measured the steps, found them ≥ 8, and wrote "holds at every step" — true of
+the arithmetic and silent about the sequence, which was the half of Rule 1 the rule itself called a
+deliberate choice. A check that reads a rule's numbers and not its intent certifies compliance it
+never tested.

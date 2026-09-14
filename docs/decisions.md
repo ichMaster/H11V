@@ -781,3 +781,52 @@ The coupling this introduces is stated in both the document and the parser: insi
 **grown** and **built** bullets, nothing is in backticks except a node id. That is a small price for
 a contract that fails red instead of rotting quietly, and the parser goes red — not blind — if the
 heading or the bullets are renamed.
+
+### 2026-09-14 — The ladder inverted and the audit did not notice, because it checked the arithmetic
+
+`ART-COLONY.md` §4.1 Rule 1 — inside the section headed *this part is binding* — prescribed the value
+ladder **drift > lithic > regolith > hull > prefab > fines**, and said the order was chosen "so the
+cliffs and dunes read brighter against the ground". The delivered pack measures **hull 86.8 > drift
+77.9 > regolith 69.7 > prefab 58.7 > fines 50.4 > lithic 42.0**: bedrock fell from second-brightest to
+the floor and the ship's plating rose to the top. The steps are 8.8 · 8.2 · 11.1 · 8.3 · 8.4 — every
+one over the required 8.
+
+**The shipped order is accepted, and §4.1 now prescribes it.** A dark bedrock rung is what makes a cut
+terrace read as a step rather than a stripe: a pale top face over a dark cut face is Rule 5 expressed
+by the ladder instead of fought by it. And a hull brighter than anything the planet has is how the
+lander stays findable at 100 nodes, which is the one silhouette the player must be able to get back to.
+The brief's version was a reasonable guess written before any texture existed; this one was arrived at
+with tiles on a screen.
+
+**The lesson is in how it went unnoticed for a release.** §11's audit row read "holds at every step",
+which was true — it measured the five steps, found them all ≥ 8, and said so. It never compared the
+*sequence*, which is the half of Rule 1 the rule itself called a deliberate choice. So a binding rule's
+arithmetic was verified and its intent was not, and three documents then certified compliance:
+§11, ROADMAP v0.8's DoD ("the pack passes every §4.1 separation rule"), and `nodes.lua`, whose lithic
+row cites §4.1 for bedrock being "the darkest rung" — citing the spec for the opposite of what the spec
+said. Nothing was broken on screen; what was broken was authority. A v1.1 biome author placing new
+materials by the binding rule would have put them on the wrong L\* bands, out of a document that read
+as verified. **A rule that states a reason needs a check that tests the reason.**
+
+Three things came out of re-measuring rather than re-reading, and they are recorded in §11:
+
+- **Rule 6 (30% brightness) had no audit row at all, and could never have had a passing one.** Multiply
+  an encoded colour by 0.3 and white itself lands at L\* 32.5, so above bedrock's dimmed 11.1 there is
+  room for three rungs of 8 L\*, not six: no six-material ladder passes Rule 6, in this pack or any
+  other. Dimmed, 66 of 105 pairs sit inside 8 L\* against 24 at full brightness. Hue survives the
+  multiply as an angle (nothing moves more than 2.7°) but not as chroma (`prefab` 6.3 → 2.34). So
+  Rule 6 is a check on the **light**, not the palette — which is the same conclusion v0.6 reached from
+  the other end when night on the device was fixed with emitting blocks (`crust` 12, `beacon` 14)
+  rather than a gamma setting. The row now says that instead of being absent.
+- **`prefab` ↔ `regolith_side` is a real Rule-2 failure and is now open** rather than unlisted: ΔL\*
+  5.1, Δhue 49.9°, ΔC 5.3, with none of the escapes the other close pairs have, at the
+  built-against-terrace boundary — the commonest thing a player will build. The cheapest measured lever
+  is lightness: lift `prefab` 2.9 L\* to 61.6, which restores the 8 L\* against the terrace face and
+  creates no new sub-60° pair. Logged for the next re-delivery, not fixed by this pass — **the art was
+  not touched.**
+- **A review's suggested fix can be wrong and only measuring says so.** The code review proposed
+  brightening `lithic_top` about 5 L\* to thicken Rule 5's thinnest pair, "headroom to fines at 50.4
+  exists". It does not: that puts `lithic_top` 0.5 L\* from `fines` at Δhue 41°, trading a thin
+  top/side step for a live collision between two layers of the same column. The pair is accepted at
+  +2.9 with the reason stated instead.
+

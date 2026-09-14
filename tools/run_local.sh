@@ -74,9 +74,18 @@ if ! "$LUANTI" --gameid list 2>&1 | grep -qx 'h11v'; then
 Linked $ROOT/games/h11v -> $LINK, but --gameid list does not list it."
 fi
 
+WORLD_PATH="$USER_DIR/worlds/$WORLD"
+
 if [ "$FRESH" = 1 ]; then
-	rm -rf "$USER_DIR/worlds/$WORLD"
-	echo "==> removed world '$WORLD'"
+	# Say which of the two things happened. The old message announced a removal
+	# unconditionally, which is how nobody noticed for a whole phase that there was
+	# never anything there to remove (below).
+	if [ -d "$WORLD_PATH" ]; then
+		rm -rf "$WORLD_PATH"
+		echo "==> removed world '$WORLD'"
+	else
+		echo "==> no world '$WORLD' to remove; it will be created"
+	fi
 fi
 
 # --- assemble the config ------------------------------------------------------
@@ -107,8 +116,20 @@ echo "    (frame rates here are not a measurement — the device is the truth)"
 # wrapper. Every documented invocation of this script failed that way until v0.9
 # (review finding H2). A new flag belongs in the case block above, and its effect
 # belongs in the generated config or in an explicit argument on this line.
+# --world, NOT --worldname, and the difference is the whole reason this gate was
+# worth anything. `--worldname` only SELECTS a world that already exists; it
+# creates nothing. So every run of this script logged `World '<name>' not
+# available` and silently fell back to the engine's default `worlds/world` — a
+# world generated at some earlier mapgen, by some earlier commit. --fresh deleted
+# a path that was never there and cheerfully said so.
+#
+# That made this the visible-change gate attesting to geometry no change had
+# touched. It was caught in v0.9's review while checking the evidence for the
+# mgv7_spflags pin: the run cited as proof the terrain still worked had drawn
+# chunks persisted from before it. `--world <path>` is the creating form, and the
+# engine's own --help says so.
 exec "$LUANTI" \
 	--config "$CONF" \
 	--gameid h11v \
-	--worldname "$WORLD" \
+	--world "$WORLD_PATH" \
 	--go

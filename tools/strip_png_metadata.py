@@ -31,6 +31,11 @@ def strip(path, dry_run):
     while i < len(data):
         (length,) = struct.unpack(">I", data[i:i + 4])
         typ = data[i + 4:i + 8].decode("latin1")
+        # A chunk that runs past the end of the file means the file is truncated, and
+        # this tool rewrites what it parsed: without this it would copy the short
+        # chunk out and overwrite a damaged PNG with a differently damaged one.
+        if i + 12 + length > len(data):
+            raise ValueError(f"{typ} chunk runs past the end of the file — truncated PNG")
         chunk = data[i:i + 12 + length]
         if typ in DROP:
             removed += len(chunk)
@@ -58,14 +63,28 @@ def main():
         return 1
 
     total, touched = 0, 0
+    failed = []
     for f in files:
-        n = strip(f, args.dry_run)
+        # Per file, because the pass is alphabetical and the files are independent.
+        # One truncated PNG used to abort the whole run mid-alphabet: every file after
+        # it kept its content credentials, the caller saw a traceback instead of a
+        # count, and the tree was left half stripped with nothing saying so.
+        try:
+            n = strip(f, args.dry_run)
+        except Exception as exc:                        # noqa: BLE001
+            print(f"  FAILED {f}: {exc}", file=sys.stderr)
+            failed.append(f)
+            continue
         if n:
             touched += 1
             total += n
             print(f"  {'would strip' if args.dry_run else 'stripped'} {n:6} B  {f}")
     verb = "would free" if args.dry_run else "freed"
     print(f"{touched}/{len(files)} file(s), {verb} {total / 1024:.1f} KiB")
+    if failed:
+        print(f"strip_png_metadata: {len(failed)} file(s) could not be read; their metadata is "
+              f"still there: {', '.join(str(f) for f in failed)}", file=sys.stderr)
+        return 1
     return 0
 
 

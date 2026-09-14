@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
-"""Acceptance gate: the asset pack conforms to specification/ART.md.
+"""Acceptance gate: the asset pack conforms to specification/ART-COLONY.md.
 
     tools/check_assets.py                 check the installed game tree
     tools/check_assets.py --pack          check the delivery of record instead
     tools/check_assets.py --verbose       print every file, not only findings
 
-Checks the contract in ART.md part two: every ordered file present at its exact
-name and size, the three alpha regimes, the colour budget, seamless tiling on
-node faces, animation strip layout, the hotbar's identical cells, and the absence
-of the metadata chunks that outweigh a 32x32 texture twenty to one.
+Checks the contract in ART-COLONY.md part two: every ordered file present at its
+exact name and size (§6.1-6.5), the three alpha regimes and the animation strip
+layout (§5.1), the colour budget and seamless tiling on node faces (§5), the
+hotbar's identical cells (§6.3), and the absence of the metadata chunks that
+outweigh a 32x32 texture twenty to one.
+
+ART-COLONY.md, not ART.md: the retheme renamed every file (turf -> regolith,
+stone -> lithic, crystal -> spire, and the gauntlet became the scanner), the
+tables below are the colony names, and ART.md survives only as the record of what
+v0 shipped. A docstring pointing at the old brief is how the --pack mode came to
+audit the retired pack for a whole release.
 
 Stdlib only, on purpose: this runs on the pipeline's critical path, and a gate
 that cannot import is a gate that breaks a build. PNG decoding is here rather
@@ -25,7 +32,12 @@ import zlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PACK_MODE = False
 GAME = ROOT / "games" / "h11v"
-PACK = ROOT / "specification" / "art" / "h11v"
+# The colony delivery, accepted 14.09.2026 (ART-COLONY.md §11), and the pack
+# tools/install_assets.sh installs from. This pointed at the retired v0 pack
+# specification/art/h11v/ while the tables below were already colony names, so
+# --pack answered with seventeen spurious "missing" findings and the delivery of
+# record could not be audited at all (review finding H3).
+PACK = ROOT / "specification" / "art" / "colony"
 
 TEX = "mods/h11_world/textures"
 MENU = "menu"
@@ -53,6 +65,13 @@ def detect_node_scale(base):
 
     A tree where the node textures disagree with each other is a half-finished
     install, and saying so is more useful than validating against either size.
+
+    Returns (scale, pixels), with scale None when the measured size is neither
+    sanctioned resolution. Only 32 (authored) and 16 (install_assets.sh --res=16)
+    are installs this project ships. Accepting any divisor of the authored size
+    instead let a double-halved tree — a downscaler run twice — report "node
+    textures 8px" and then validate green against 8px, because every entry in the
+    tables was divided by the same 4 (review finding L22).
     """
     tex = base / TEX
     ref = tex / "h11_fines.png"
@@ -63,8 +82,8 @@ def detect_node_scale(base):
     except Exception:                                   # noqa: BLE001
         return 1, None
     authored = NODE_TEXTURES["h11_fines.png"][0]
-    if width <= 0 or authored % width:
-        return 1, None
+    if width not in (authored, TARGET_NODE_PX):
+        return None, width
     return authored // width, width
 
 # name -> (width, height, alpha regime, max colours)
@@ -104,7 +123,7 @@ MENU_IMAGES = {
     "header.png": (1024, 256, "any", 0),
     "background.png": (1920, 1080, "any", 0),
 }
-# Optional: ordered in ART.md section 5.4, used from v1 onward.
+# Optional: ordered in ART-COLONY.md §6.5, used from v1 onward.
 OPTIONAL = {
     f"h11_glyph_{c}.png": (16, 16, "binary", 4) for c in "abcdef"
 } | {"h11_crust_2.png": (32, 32, "opaque", 16)}
@@ -147,14 +166,28 @@ class Png:
         if data[:8] != b"\x89PNG\r\n\x1a\n":
             raise ValueError("not a PNG")
         self.chunks = []
+        self.trns = False
         idat = bytearray()
         i = 8
         while i < len(data):
             (length,) = struct.unpack(">I", data[i:i + 4])
             typ = data[i + 4:i + 8].decode("latin1")
+            # Every chunk carries a CRC and checking it costs nothing here (zlib is
+            # already imported for the IDAT). Without it a truncated or bit-rotted
+            # file decoded to garbage and was then *classified* — colours counted,
+            # seams measured, a verdict printed — rather than rejected, which is the
+            # one thing a gate must never do with a file it cannot trust.
+            body = data[i + 4:i + 8 + length]
+            (want_crc,) = struct.unpack(">I", data[i + 8 + length:i + 12 + length])
+            if zlib.crc32(body) & 0xFFFFFFFF != want_crc:
+                raise ValueError(f"{typ} chunk fails its CRC — the file is corrupt")
             self.chunks.append((typ, length))
             if typ == "IDAT":
                 idat += data[i + 8:i + 8 + length]
+            elif typ == "tRNS":
+                # Colour-key transparency, which this decoder does not apply. Recorded
+                # so check_one can refuse to pronounce on an alpha regime it cannot see.
+                self.trns = True
             elif typ == "IHDR":
                 self.width, self.height, self.depth, self.color, _, _, interlace = \
                     struct.unpack(">IIBBBBB", data[i + 8:i + 8 + 13])
@@ -173,6 +206,13 @@ class Png:
         pos = 0
         for y in range(h):
             ftype = raw[pos]; pos += 1
+            # PNG defines filters 0-4. The chain below used to fall through to "no
+            # filter" for anything else, so a corrupt row silently decoded as
+            # whatever bytes it happened to contain and the file was then classified
+            # against the contract. An unknown filter means the data is not a PNG
+            # row, and the only honest answer is to refuse the file.
+            if ftype > 4:
+                raise ValueError(f"row {y} uses filter type {ftype}; PNG defines 0-4")
             line = bytearray(raw[pos:pos + stride]); pos += stride
             prev = out[(y - 1) * stride:y * stride] if y else bytes(stride)
             for x in range(stride):
@@ -200,6 +240,14 @@ class Png:
         return (p[0], p[1], p[2], p[3] if ch == 4 else 255)
 
     def alphas(self):
+        """The alpha values present. A colour-type-2 file has none, hence {255}.
+
+        That answer is honest about the pixels and useless as a regime verdict: an
+        RGB file cannot be distinguished from an RGBA one that happens to be fully
+        opaque. check_one therefore rejects colour type 2 outright wherever the
+        contract asks for transparency, instead of reasoning about this set — see
+        the comment there.
+        """
         if self.channels == 3:
             return {255}
         return {self.pixels[i] for i in range(3, len(self.pixels), 4)}
@@ -213,6 +261,7 @@ class Png:
         sub = Png.__new__(Png)
         sub.path, sub.width, sub.height = self.path, self.width, height
         sub.channels, sub.depth, sub.color = self.channels, self.depth, self.color
+        sub.trns = self.trns
         stride = self.width * self.channels
         sub.pixels = self.pixels[top * stride:(top + height) * stride]
         sub.chunks = []
@@ -224,6 +273,19 @@ def edge_report(img):
 
     A texture that tiles has a wrap difference no worse than its own interior
     variation; a hard seam shows up as a multiple of it.
+
+    KNOWN LIMITATION, deliberately not fixed here (review finding M15, deferred to
+    the next art re-delivery): the difference is RGB only, alpha is ignored, and
+    both fully transparent pixels and the colour hiding under them count as normal
+    image content. On a texture whose transparent area is uniform black — h11_bloom,
+    47% clear — the interior average is dominated by hard black-to-lilac steps that
+    nobody ever sees, so the interior-scaled threshold inflates (measured: 106.8
+    against a real wrap of 5.8) and the check passes whatever the seam does. It is
+    near-vacuous for exactly the one binary-alpha surface in TILE_H_ONLY, and sound
+    for the opaque node faces, which is every other entry. An alpha-aware metric
+    means re-deciding what a seam even is where both sides are transparent, and
+    that is a conversation to have with the art, not a patch to slip in under a
+    gate repair.
     """
     w, h, = img.width, img.height
 
@@ -251,24 +313,56 @@ def check_one(path, spec, findings, warnings, verbose, scalable=False):
 
     # In the game tree the node textures have been halved; UI and menu art has not.
     #
-    # Two conditions, both of which tools/downscale_pack.py also applies: the file
-    # is a node texture rather than UI or menu art, and it was authored wider than
-    # the target. Sharing the reasoning rather than a list of names is what keeps
-    # the 16x16 glyph overlays unscaled in both tools without either naming them —
-    # and what stopped this check from trying to halve the 1920x1080 menu
-    # background on its first draft.
+    # Two conditions: the entry comes from a table passed scalable=True, which is
+    # the node textures and not the menu art (the reason the first draft of this
+    # check did not try to "halve" the 1920x1080 background), and it was authored
+    # wider than the target, which is what leaves the 16x16 glyph overlays alone.
+    #
+    # Only that second condition is shared with tools/downscale_pack.py. That tool
+    # decides node-texture-or-not from its own hard-coded SKIP list of UI filenames,
+    # not from these tables, so the exemptions are two lists coupled by hand: a UI
+    # texture added to UI_TEXTURES here and not to SKIP there would be silently
+    # halved on install and then measured against its full size here. Add UI art to
+    # both. (An earlier version of this comment claimed the two tools share the
+    # reasoning; they share half of it.)
     if not PACK_MODE and scalable and want_w > TARGET_NODE_PX:
         want_w, want_h = want_w // NODE_SCALE, want_h // NODE_SCALE
     if (img.width, img.height) != (want_w, want_h):
         where = "the authored pack" if PACK_MODE else "the shipped game"
         findings.append(f"{name}: is {img.width}x{img.height}, {where} wants {want_w}x{want_h}")
 
+    # The alpha regimes (ART-COLONY.md §5.1). Two things have to be established
+    # before the values can be read at all:
+    #
+    # A colour-type-2 (RGB) file has no alpha channel, so alphas() can only answer
+    # {255} — and {255} is a subset of {0, 255}, which is how a flattened re-export
+    # of h11_bloom or crosshair.png used to pass as "binary" with a green gate: the
+    # bloom crown would render as solid cubes and the crosshair as an opaque black
+    # tile over the view. Reproduced with a synthetic file (review finding M16, and
+    # the fix is verified against one). So a regime that asks for transparency
+    # demands a real alpha channel, and "binary" demands both values actually
+    # present: an entirely opaque texture is not a binary-alpha one, it is opaque.
+    #
+    # A tRNS chunk is colour-key transparency this decoder does not apply, so the
+    # alphas above are not what the engine will draw. Rather than half-support it,
+    # the gate says it cannot tell.
     alphas = img.alphas()
-    if regime == "opaque" and alphas != {255}:
+    if img.trns and regime != "any":
+        findings.append(f"{name}: carries a tRNS colour-key chunk, whose transparency this gate does "
+                        f"not decode, so the ordered {regime} regime cannot be verified — re-export "
+                        "with a real alpha channel")
+    elif regime in ("binary", "partial") and img.channels == 3:
+        findings.append(f"{name}: is PNG colour type 2 (RGB, no alpha channel) but {regime} alpha is "
+                        "ordered — a flattened export would render fully opaque")
+    elif regime == "opaque" and alphas != {255}:
         findings.append(f"{name}: must be fully opaque, has alpha values {sorted(alphas)[:4]}…")
-    elif regime == "binary" and not alphas <= {0, 255}:
+    elif regime == "binary" and alphas != {0, 255}:
         mids = sorted(a for a in alphas if 0 < a < 255)
-        findings.append(f"{name}: must use binary alpha (0 or 255), has {len(mids)} midtones e.g. {mids[:4]}")
+        if mids:
+            findings.append(f"{name}: must use binary alpha (0 or 255), has {len(mids)} midtones e.g. {mids[:4]}")
+        else:
+            findings.append(f"{name}: must use binary alpha, but only {sorted(alphas)} occurs — "
+                            "a binary-alpha texture has both transparent and opaque pixels")
     elif regime == "partial" and all(a in (0, 255) for a in alphas):
         findings.append(f"{name}: must be semi-transparent, but every pixel is fully opaque or clear")
 
@@ -297,7 +391,7 @@ def check_one(path, spec, findings, warnings, verbose, scalable=False):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--pack", action="store_true",
-                    help="check specification/art/h11v (the delivery of record) instead of the game")
+                    help="check specification/art/colony (the delivery of record) instead of the game")
     ap.add_argument("--verbose", "-v", action="store_true")
     args = ap.parse_args()
 
@@ -320,6 +414,16 @@ def main():
     else:
         NODE_SCALE, node_px = detect_node_scale(base)
         print(f"check_assets: {where} (node textures {node_px or '?'}px)")
+        if NODE_SCALE is None:
+            # An unsanctioned size is a finding in itself, and the only one with an
+            # explanation. The size checks below then run against the authored table,
+            # so every mis-scaled texture is also listed: that is the tree's real
+            # state, and this finding says why the whole list looks that way.
+            findings.append(
+                f"node textures are {node_px}px — this project ships 32 (the authored size) or "
+                f"{TARGET_NODE_PX} (tools/install_assets.sh --res={TARGET_NODE_PX}), nothing else; "
+                "re-install the pack rather than trusting the sizes below")
+            NODE_SCALE = 1
 
     # scalable: node textures under textures/, which is what the downscaler touches.
     for folder, table, required, scalable in ((TEX, NODE_TEXTURES, True, True),
@@ -357,19 +461,31 @@ def main():
         if img.height % img.width:
             findings.append(f"{name}: height {img.height} is not a whole number of {img.width}px frames")
         elif img.height // img.width != want_frames:
-            findings.append(f"{name}: {img.height // img.width} frames, ART.md orders {want_frames}")
+            findings.append(f"{name}: {img.height // img.width} frames, ART-COLONY.md §5.1 orders {want_frames}")
 
-    # Every texture the Lua actually names must exist. ART.md's contract says what
-    # the pack must contain; this says the code and the pack agree on spelling —
+    # Every texture the Lua actually names must exist. ART-COLONY.md's contract says
+    # what the pack must contain; this says the code and the pack agree on spelling —
     # the half that a delivery audit cannot see. A mistyped name in a NODES row is
     # not an engine error: it is an unknown-texture placeholder, which looks like
     # an art problem and is a typo.
+    #
+    # Names are matched anywhere inside a string literal, not as the whole literal.
+    # Engine texture strings are a modifier language: the overlay form v1 uses for
+    # the mutation stencils is one PNG name, a caret, then another, and there are
+    # [combine: and [colorize: forms as well. A pattern anchored to the closing
+    # quote saw none of them — so the one composite that matters most, the glyph
+    # overlay on a mutated block, was the one this check could not see.
+    #
+    # Literals rather than the whole file, so a name in a comment or in a
+    # deliberately commented-out row is not reported as a missing texture.
     lua_dir = base / "mods" / "h11_world"
     tex_dir = base / TEX
     if lua_dir.is_dir() and tex_dir.is_dir():
         named = set()
         for lua in sorted(lua_dir.glob("*.lua")):
-            named |= set(re.findall(r'"(h11_[a-z0-9_]+\.png)"', lua.read_text()))
+            src = lua.read_text()
+            for literal in re.findall(r'"([^"\n]*)"', src) + re.findall(r"'([^'\n]*)'", src):
+                named |= set(re.findall(r'h11_[a-z0-9_]+\.png', literal))
         have = {f.name for f in tex_dir.glob("*.png")}
         for name in sorted(named - have):
             findings.append(f"{name}: named in h11_world Lua but not installed in {TEX}/")
@@ -386,7 +502,7 @@ def main():
             celli = [bar.pixels[y * stride + off:y * stride + off + 64 * bar.channels] for y in range(bar.height)]
             if celli != cell0:
                 findings.append(f"h11_hotbar.png: cell {i + 1} differs from cell 1 — "
-                                "the 6-slot crop would not be lossless (ART.md §5.2)")
+                                "the 6-slot crop would not be lossless (ART-COLONY.md §6.3)")
                 break
 
     checked = len(images)

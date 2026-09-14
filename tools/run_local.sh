@@ -53,11 +53,25 @@ case "$PROFILE" in low|mid|high) ;; *) die "unknown profile '$PROFILE' (low|mid|
 USER_DIR="$HOME/Library/Application Support/luanti"
 [ -d "$USER_DIR" ] || USER_DIR="$HOME/Library/Application Support/minetest"
 mkdir -p "$USER_DIR/games"
-ln -sfn "$ROOT/games/h11v" "$USER_DIR/games/h11v"
+LINK="$USER_DIR/games/h11v"
+
+# A real directory where the link belongs is fatal, and silently so if unchecked.
+# `ln -sfn` cannot replace a directory: it creates the link INSIDE it, as
+# games/h11v/h11v, and exits 0 (reproduced on this macOS). The --gameid list
+# guard below then still passes, because a stale copy of the game is itself a
+# valid game named h11v — so the engine would load week-old code and every gate
+# that runs through this script would be green about the wrong tree.
+if [ -d "$LINK" ] && [ ! -L "$LINK" ]; then
+	die "a real directory sits where the game link belongs:
+  $LINK
+It is a copy of the game, not a link to this checkout, and the engine would load
+it instead of $ROOT/games/h11v. Move it aside or delete it, then re-run."
+fi
+ln -sfn "$ROOT/games/h11v" "$LINK" || die "cannot link the game into $USER_DIR/games"
 
 if ! "$LUANTI" --gameid list 2>&1 | grep -qx 'h11v'; then
 	die "the engine cannot see the h11v game.
-Linked $ROOT/games/h11v -> $USER_DIR/games/h11v, but --gameid list does not list it."
+Linked $ROOT/games/h11v -> $LINK, but --gameid list does not list it."
 fi
 
 if [ "$FRESH" = 1 ]; then
@@ -86,9 +100,15 @@ trap 'rm -f "$CONF"' EXIT
 echo "==> H11V · profile '$PROFILE' · 640x480 · world '$WORLD'"
 echo "    (frame rates here are not a measurement — the device is the truth)"
 
+# No "$@" here, ever. The options above are this script's own — the loop that
+# parses them does not consume them — and the engine aborts on any parameter it
+# does not know: `Unknown command-line parameter "--profile=low"` followed by its
+# whole option dump, which reads like a broken engine rather than a broken
+# wrapper. Every documented invocation of this script failed that way until v0.9
+# (review finding H2). A new flag belongs in the case block above, and its effect
+# belongs in the generated config or in an explicit argument on this line.
 exec "$LUANTI" \
 	--config "$CONF" \
 	--gameid h11v \
 	--worldname "$WORLD" \
-	--go \
-	"$@"
+	--go

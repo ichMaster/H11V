@@ -4,10 +4,12 @@
 #   tools/test_worldgen.sh              run the gate
 #   tools/test_worldgen.sh --keep       keep the temporary world for inspection
 #   tools/test_worldgen.sh --area=64    scan a smaller area (default 128)
+#   tools/test_worldgen.sh --timeout=60 give up after N seconds (default 180)
 #
-# --area is for quick iteration. The DoD's elevation threshold describes the
-# 128x128 map, so below that area it is reported but not asserted; composition
-# assertions apply at every size.
+# --area is for quick iteration. The DoD's numbers describe the 128x128 map, so
+# at any other area they are measured and printed but not asserted — a smaller
+# sample honestly measures less and a larger one measures a different map. The
+# composition assertions have no such problem and apply at every size.
 #
 # Starts a dedicated server with games/h11v, force-emerges the area, scans it with
 # a VoxelManip, prints one result line and shuts down. Exits 0 when every
@@ -38,10 +40,29 @@ for arg in "$@"; do
 		--keep) KEEP=1 ;;
 		--area=*) AREA="${arg#*=}" ;;
 		--timeout=*) TIMEOUT="${arg#*=}" ;;
-		-h|--help) sed -n '2,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		-h|--help) sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		*) echo "Unknown option: $arg (try --help)" >&2; exit 2 ;;
 	esac
 done
+
+# Both values are compared with `[` further down, and a non-numeric one does not
+# make this gate fail — it makes the gate stop checking. `--timeout=3m` made
+# `[ "$elapsed" -ge 3m ]` exit 2 on every pass of the wait loop, and since `set -e`
+# is deliberately off the `if` was simply false: the hang guard was gone and the
+# run would have waited forever. `--area=banana` reached the engine, which fell
+# back to 128 inside the probe, while the shell saw an AREA that was not 128 and
+# skipped every DoD assertion — a gate printing PASS while asserting almost
+# nothing. Both are rejected here, where the message can name the option.
+case "$AREA" in ''|*[!0-9]*)
+	echo "test_worldgen: --area must be a whole number of nodes, not '$AREA'" >&2; exit 2 ;;
+esac
+case "$TIMEOUT" in ''|*[!0-9]*)
+	echo "test_worldgen: --timeout must be a whole number of seconds, not '$TIMEOUT'" >&2; exit 2 ;;
+esac
+# The scan samples one column in sixteen, so below 16 nodes it samples almost
+# nothing and every measurement it prints is noise.
+[ "$AREA" -ge 16 ] || { echo "test_worldgen: --area must be at least 16 nodes" >&2; exit 2; }
+[ "$TIMEOUT" -ge 1 ] || { echo "test_worldgen: --timeout must be at least 1 second" >&2; exit 2; }
 
 # `|| true`: sourcing bare under `set -e` would abort here, before the message.
 . "$ROOT/tools/luanti_path.sh" || true
@@ -55,10 +76,21 @@ fi
 
 # --- an isolated world, and a free port --------------------------------------
 
-WORK="$(mktemp -d -t h11v-worldgen)"
+# `mktemp -d -t PREFIX` is a BSD-ism. GNU mktemp reads -t as the deprecated
+# "template in $TMPDIR" flag and refuses a template with no XXXXXX, so on the Pi —
+# a platform this gate is explicitly meant to run on — the command failed, WORK
+# became empty under `set -u` (which does not trip on command substitution), WORLD
+# became /world, and the run collapsed into permission errors that read like a
+# broken checkout. The explicit template works on both.
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/h11v-worldgen.XXXXXX")"
+[ -n "$WORK" ] && [ -d "$WORK" ] || {
+	echo "test_worldgen: could not create a temporary directory in ${TMPDIR:-/tmp}" >&2; exit 2; }
 SERVER_PID=""
 
+CLEANED=0
 cleanup() {
+	[ "$CLEANED" = 0 ] || return 0
+	CLEANED=1
 	if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
 		kill "$SERVER_PID" 2>/dev/null
 		# Give it a moment to release the port, then insist.
@@ -74,13 +106,24 @@ cleanup() {
 		rm -rf "$WORK"
 	fi
 }
-trap cleanup EXIT INT TERM
+# A signal handler that only cleans up is not enough: bash runs the handler and
+# then RESUMES the script, so Ctrl-C used to kill the server, fall out of the wait
+# loop, find no probe line and print "FAIL — the server exited without reporting",
+# which describes nothing that happened. So the signal traps exit, and cleanup is
+# idempotent because exiting from a handler runs the EXIT trap as well.
+trap cleanup EXIT
+trap 'echo >&2; echo "test_worldgen: interrupted" >&2; exit 130' INT
+trap 'echo "test_worldgen: terminated" >&2; exit 143' TERM
 
 # Ask the kernel for an unused port rather than guessing one. Guessing is how a
 # leftover server from an earlier run turns into a bind error nobody can place.
+#
+# UDP, not TCP: the engine's port is the UDP one ("Network port to listen (UDP)",
+# minetest.conf.example), so a free TCP port is no evidence at all about whether
+# the port the server is about to bind is free.
 PORT="$(python3 -c '
 import socket
-s = socket.socket(); s.bind(("127.0.0.1", 0))
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("127.0.0.1", 0))
 print(s.getsockname()[1]); s.close()
 ')"
 
@@ -173,15 +216,29 @@ MIN_WATER=1                # the DoD asks only that water is present
 # seed does not fully pin. Keep the margins wide; a threshold set near the
 # measured value makes this gate flaky.
 MIN_GROWTHS=20             # the DoD: "at least 20 trees in a 128x128 area"
-MIN_TREES=4                # a floor, not the DoD: catches a schematic that places nothing
+# A floor, not the DoD: the point is to catch a schematic that places nothing,
+# and a schematic that places nothing measures exactly 0. This was 4, which is a
+# different claim entirely — 4 sampled columns is 4 * STEP^2 = 64 growths, 3.2x
+# what the DoD asks — and it could never be the binding assertion anyway, because
+# MIN_GROWTHS=20 already requires trees >= 2.
+#
+# That 16x granularity is worth stating plainly: growths only ever takes multiples
+# of 16, so the DoD's "at least 20" is in practice "at least 32".
+MIN_TREES=1
 
 fail=0
 assert_min() { # name value minimum
 	# The non-numeric case must FAIL, not pass. `[ nil -lt 8 ]` exits 2, and a bare
 	# `if` would take that as "not less than" and print ok — so a probe reporting
 	# surface_min=nil would sail through the gate it exists to be caught by.
-	case "$2" in
-		''|*[!0-9-]*|-) echo "  FAIL $1=$2 (not a number)" >&2; fail=1; return ;;
+	#
+	# `${2#-}` strips one leading minus and then nothing but digits is allowed, so a
+	# sign is accepted only where a sign belongs. The previous pattern listed `-` in
+	# the accepted character class, which permitted it anywhere: `3-` reached the
+	# comparison, `[ 3- -lt 3 ]` exited 2, and the else branch printed ok — the exact
+	# failure this guard is here to prevent.
+	case "${2#-}" in
+		''|*[!0-9]*) echo "  FAIL $1=$2 (not a number)" >&2; fail=1; return ;;
 	esac
 	if [ "$2" -lt "$3" ]; then
 		echo "  FAIL $1=$2 (need >= $3)" >&2; fail=1
@@ -207,10 +264,14 @@ assert_min "sampled" "$(field sampled)" 1
 # same terrain honestly measures less, and asserting the full map's number
 # against a fraction of it would turn --area into a source of red gates that mean
 # nothing. Composition assertions have no such problem and always apply.
-if [ "$AREA" = "$CONTRACT_AREA" ]; then
+#
+# Numeric comparison, not string: AREA is validated as digits at parse time, and
+# `-eq` also makes 0128 and +128 the same area the DoD describes rather than a
+# silent trip down the informational branch.
+if [ "$AREA" -eq "$CONTRACT_AREA" ]; then
 	assert_min "elevation_range" "$(field elevation_range)" "$MIN_ELEVATION_RANGE"
 else
-	echo "  --   elevation_range=$(field elevation_range) (informational: the DoD's >= $MIN_ELEVATION_RANGE applies at area $CONTRACT_AREA)"
+	echo "  --   elevation_range=$(field elevation_range) (informational: the DoD's >= $MIN_ELEVATION_RANGE is asserted only at area $CONTRACT_AREA)"
 fi
 assert_eq  "surface_top" "$(field surface_top)" "$WANT_SURFACE"
 assert_min "surface_top_pct" "$(field surface_top_pct)" "$MIN_SURFACE_PCT"
@@ -222,12 +283,12 @@ assert_min "surface_top_pct" "$(field surface_top_pct)" "$MIN_SURFACE_PCT"
 # counts columns containing a trunk — neither is a raw block count, and the probe
 # says so where it computes them. Asserting a number whose definition lives
 # somewhere else is how a gate starts meaning something nobody intended.
-if [ "$AREA" = "$CONTRACT_AREA" ]; then
+if [ "$AREA" -eq "$CONTRACT_AREA" ]; then
 	assert_min "water" "$(field water)" "$MIN_WATER"
 	assert_min "growths" "$(field growths)" "$MIN_GROWTHS"
 	assert_min "trees" "$(field trees)" "$MIN_TREES"
 else
-	echo "  --   water=$(field water) growths=$(field growths) (informational below area $CONTRACT_AREA)"
+	echo "  --   water=$(field water) growths=$(field growths) trees=$(field trees) (informational: asserted only at area $CONTRACT_AREA)"
 fi
 
 # Engine errors are a failure even when the probe reports ok: a world that

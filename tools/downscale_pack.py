@@ -45,6 +45,14 @@ import zlib
 # UI art is sized in screen pixels, or extruded into a mesh; halving it shrinks it
 # on the panel or coarsens the extrusion, neither of which is what "16x16
 # textures" means.
+#
+# This list is hand-coupled to UI_TEXTURES in tools/check_assets.py: that gate
+# decides what is UI art from its own table, this one from these four names, and
+# nothing checks that the two agree. A UI texture added there and not here gets
+# silently halved on install and then fails that gate against its full size. Add
+# UI art to both. (check_assets' comment used to claim the two tools share the
+# reasoning; what they actually share is only the "already at or below TARGET" rule
+# below.)
 SKIP = {
     "crosshair.png", "h11_scanner.png", "h11_hotbar.png", "h11_hotbar_selected.png",
 }
@@ -82,8 +90,14 @@ def read_png(path):
     raw = zlib.decompress(bytes(idat))
     stride = width * ch
     rows, prev, pos = [], bytes(stride), 0
-    for _ in range(height):
+    for y in range(height):
         ftype = raw[pos]; pos += 1
+        # PNG defines filters 0-4, and anything else means these bytes are not a PNG
+        # row. The chain below used to fall through to "no filter", which here is
+        # worse than in the verifier: this tool writes what it decoded back over the
+        # file, so a corrupt row would be baked into the shipped texture.
+        if ftype > 4:
+            raise ValueError(f"row {y} uses filter type {ftype}; PNG defines 0-4")
         line = bytearray(raw[pos:pos + stride]); pos += stride
         for x in range(stride):
             a = line[x - ch] if x >= ch else 0
@@ -148,13 +162,15 @@ def main():
         return 1
 
     done = 0
+    failed = []
     for f in sorted(tex.glob("*.png")):
         if f.name in SKIP:
             continue
         try:
             result = halve(f, args.dry_run)
         except Exception as exc:                        # noqa: BLE001
-            print(f"  skip {f.name}: {exc}", file=sys.stderr)
+            print(f"  FAILED {f.name}: {exc}", file=sys.stderr)
+            failed.append(f.name)
             continue
         if result:
             w, h, nw, nh = result
@@ -163,6 +179,16 @@ def main():
             done += 1
     print(f"{done} texture(s) {'would be ' if args.dry_run else ''}halved; "
           f"{len(SKIP)} UI file(s) left at their screen size")
+    # A file this tool could not read is a failed install, not a skipped step. It
+    # used to print "skip" to stderr and still return 0, and the caller could not
+    # tell the difference: install_assets.sh only reads the last line, and
+    # check_assets.py accepts 32px node textures because that is the other supported
+    # install — so a --res=16 run that halved nothing at all was green all the way
+    # through (review finding M11). The exit status is now the honest one.
+    if failed:
+        print(f"downscale_pack: {len(failed)} file(s) could not be processed: "
+              f"{', '.join(failed)}", file=sys.stderr)
+        return 1
     return 0
 
 
